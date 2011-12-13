@@ -1,5 +1,7 @@
 #include "KIMserviceC.h"
 #include "KIMstatus.h"
+#include <stdlib.h>
+#include <string.h>
 
 /* Define neighborlist structure */
 typedef struct
@@ -33,18 +35,53 @@ int set_kim_cluster_half_neigh(void* kimmdl) {
     return status;
 }
 
-int set_neigh_object(void* kimmdl, int sz1, int* NNeighbors, int sz2, int* neighborList, int sz3, double* RijList) {
-//int set_neigh_object(void* kimmdl, int* NNeighbors, int* neighborList, double* RijList) {
-    NeighList *nl = (NeighList *)malloc(sizeof(NeighList));
+void safefree(void *ptr) {
+    if (ptr != NULL)
+        free(ptr);
+}
+
+int free_neigh_object(void* pkim) {
+    NeighList *nl;
     int status;
 
+    nl = (NeighList*) KIM_API_get_data(pkim, "neighObject", &status);
+    if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
+
+    if (nl==NULL)
+        return KIM_STATUS_OK;
+
+    safefree(nl->NNeighbors);
+    safefree(nl->neighborList);
+    safefree(nl->RijList);
+    safefree(nl);
+
+    status = KIM_API_set_data(pkim, "neighObject", 1, NULL);
+    return status;
+}
+
+int set_neigh_object(void* kimmdl, int sz1, int* NNeighbors, int sz2, int* neighborList, int sz3, double* RijList) {
+//int set_neigh_object(void* kimmdl, int* NNeighbors, int* neighborList, double* RijList) {
+    NeighList *nl;
+    int status;
+    nl = (NeighList*) KIM_API_get_data(kimmdl, "neighObject", &status);
+    if (KIM_STATUS_OK == status) {
+        free_neigh_object(kimmdl);
+    };
+    nl = (NeighList *)malloc(sizeof(NeighList));
+
     nl->iteratorId = -1;
+    /*
     nl->NNeighbors = NNeighbors;
     nl->neighborList = neighborList;
     nl->RijList = RijList;
-
+    */
+    nl->NNeighbors = (int*)malloc(sizeof(int)*sz1);
+    nl->neighborList = (int*)malloc(sizeof(int)*sz2);
+    nl->RijList = (double*)malloc(sizeof(double)*sz3);
+    memcpy(nl->NNeighbors, NNeighbors, sizeof(int)*sz1);
+    memcpy(nl->neighborList, neighborList, sizeof(int)*sz2);
+    memcpy(nl->RijList, RijList, sizeof(double)*sz3);
     status = KIM_API_set_data(kimmdl, "neighObject", 1, nl);
-    // FIXME - Memory leak!
     return status;
 }
 
@@ -99,7 +136,8 @@ int get_periodic_neigh(void* kimmdl, int *mode, int *request, int* atom,
    else if (1 == *mode) /* locator mode */
    {
        // one based fix?
-      if ((*request > *numberOfAtoms) || (*request <= 0)) /* invalid id */
+       // use zero based
+      if ((*request >= *numberOfAtoms) || (*request < 0)) /* invalid id */
       {
          KIM_API_report_error(__LINE__, __FILE__,"Invalid atom ID in get_periodic_neigh", KIM_STATUS_ATOM_INVALID_ID);
          return KIM_STATUS_ATOM_INVALID_ID;
@@ -120,7 +158,7 @@ int get_periodic_neigh(void* kimmdl, int *mode, int *request, int* atom,
 
    /* set the returned number of neighbors for the returned atom */
    //*numnei = *((*nl).NNeighbors);
-   *numnei = (*nl).NNeighbors[*atom-1];
+   *numnei = (*nl).NNeighbors[*atom];
 
    /* set the location for the returned neighbor list */
    *nei1atom = (*nl).neighborList;
@@ -128,7 +166,7 @@ int get_periodic_neigh(void* kimmdl, int *mode, int *request, int* atom,
    /* set the pointer to Rij to appropriate value */
    *Rij = (*nl).RijList;
 
-   for(i = 0; i < *atom-1; i++) {
+   for(i = 0; i < *atom; i++) {
        *nei1atom += (*nl).NNeighbors[i];
        *Rij += (*nl).NNeighbors[i]*3;
     }
