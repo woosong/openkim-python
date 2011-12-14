@@ -30,4 +30,6 @@ setup (name = 'kimservice',
     description = """KIM python interface""",
     ext_modules = [kimservice_module, neighborlist_module],
     py_modules = ['kimdescriptor'],
+    packages=['virial'],
+    package_data={'virial': ['*.c', '*.h', '*.i']},
     )
