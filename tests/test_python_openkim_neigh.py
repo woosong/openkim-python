@@ -159,14 +159,10 @@ if KIM_STATUS_OK > status:
 cnt = 1
 try:
     KIM_API_allocate(pkim, NCLUSTERATOMS, ATYPES)
-    status = KIM_API_model_init(pkim)
-    if KIM_STATUS_OK > status:
-        raise kimservice.error("KIM_API_model_init")
-    import neighborlist
-    status = neighborlist.set_kim_periodic_full_neigh(pkim)
 
     numberOfAtoms = KIM_API_get_data_ulonglong(pkim, "numberOfAtoms")
     numberAtomTypes = KIM_API_get_data_int(pkim, "numberAtomTypes")
+    numberContributingAtoms=KIM_API_get_data_int(pkim,"numberContributingAtoms")
     atomTypes = KIM_API_get_data_int(pkim, "atomTypes")
     coordinates = KIM_API_get_data_double(pkim, "coordinates")
     cutoff = KIM_API_get_data_double(pkim, "cutoff")
@@ -174,11 +170,19 @@ try:
     forces = KIM_API_get_data_double(pkim, "forces")
 
     # Set values 
-    
-    
     numberOfAtoms[0] = NCLUSTERATOMS
-    numberAtomTypes = ATYPES
+    numberContributingAtoms[0]=NCLUSTERATOMS
+    numberAtomTypes[0] = ATYPES
+
+    status = KIM_API_model_init(pkim)
+    if KIM_STATUS_OK > status:
+        raise kimservice.error("KIM_API_model_init")
+    import neighborlist
+    status = neighborlist.set_kim_periodic_full_neigh(pkim)
+    status = neighborlist.set_kim_periodic_half_neigh(pkim)
+
     KIM_API_print(pkim)
+
     atypecode = KIM_API_get_aTypeCode(pkim, "Ar")
     for i in range(numberOfAtoms[0]):
         atomTypes[i] = atypecode
@@ -189,7 +193,6 @@ try:
     neighborlist.set_neigh_object(pkim, NNeighbors, HalfNNeighbors, neighborList, RijList)
 
     KIM_API_model_compute(pkim)
-    
 
 except error:
     KIM_API_report_error(error.message,errno)
