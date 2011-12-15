@@ -21,7 +21,7 @@ SystemOfUnitsFix := fixed
 SUPPORTED_ATOM/PARTICLES_TYPES:
 # Symbol/name           Type                    code
 
-Ar                      spec                    18
+Cu                      spec                    18
 
 
 #######################################################################################################
@@ -32,7 +32,13 @@ ZeroBasedLists           dummy
 
 Neigh_BothAccess        dummy
 
+NEIGH-RVEC-H            dummy
+
 NEIGH-RVEC-F            dummy
+
+NEIGH-PURE-H            dummy
+
+NEIGH-PURE-F            dummy
 
 
 #######################################################################################################
@@ -49,9 +55,14 @@ coordinates             real*8       length     standard                [numberO
 
 get_full_neigh          method       none       none                    []
 
+get_half_neigh          method       none       none                    []
+
 neighObject             pointer      none       none                    []
 
-
+numberContributingAtoms integer      none       none                    []
+              
+process_d1Edr           method      none        none                    []
+              
 #######################################################################################################
 MODEL_OUTPUT:
 # Name                  Type         Unit       SystemU/Scale           Shape              Requirements
@@ -65,3 +76,9 @@ cutoff                  real*8       length     standard                []
 energy                  real*8       energy     standard                []
 
 forces                  real*8       force      standard                [numberOfAtoms,3]
+
+virialPerAtom           real*8       pressure   standard                [numberOfAtoms,6] 
+
+virialGlobal            real*8       pressure   standard                [6]     
+
+

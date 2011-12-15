@@ -4,146 +4,55 @@ from kimservice import *
 import neighborlist
 import virial
 
-FCCSPACING = 5.260
+# Copper
+FCCSPACING = 3.715
 NCELLSPERSIDE = 2
 DIM = 3
 ATYPES = 1
-NCLUSTERATOMS = (4*(NCELLSPERSIDE*NCELLSPERSIDE*NCELLSPERSIDE) + 6*(NCELLSPERSIDE*NCELLSPERSIDE) + 3*(NCELLSPERSIDE) + 1)
-
-#
-# create_FCC_configuration function
-#
-#  creates a cubic configuration of FCC atoms with lattice spacing
-#  `FCCspacing' and `nCellsPerSide' cells along each direction.
-#
-#  With periodic==0. this will result in a total number of atoms equal to
-#  4*(nCellsPerSide)**3 + 6*(nCellsPerSide)**2 + 3*(nCellsPerSide) + 1
-#
-#  With periodic==1 this will result in a total number of atoms equal to
-#  4*(nCellsPerSide)**3
-#
-#  Returns the Id of the atom situated in the middle of the configuration
-#  (this atom will have the most neighbors.)
-#
-def create_FCC_configuration(FCCspacing, nCellsPerSide, periodic, coords):
-    # local variables 
-    FCCshifts = numpy.zeros((4,3), dtype=numpy.float64)
-    latVec = numpy.zeros(3, dtype=numpy.float64)
-    MiddleAtomId = 0
-
-    # create a cubic FCC cluster 
-    FCCshifts[0,0] = 0.0
-    FCCshifts[0,1] = 0.0
-    FCCshifts[0,2] = 0.0
-    
-    FCCshifts[1,0] = 0.5*FCCspacing
-    FCCshifts[1,1] = 0.5*FCCspacing
-    FCCshifts[1,2] = 0.0
-    
-    FCCshifts[2,0] = 0.5*FCCspacing
-    FCCshifts[2,1] = 0.0
-    FCCshifts[2,2] = 0.5*FCCspacing
-    
-    FCCshifts[3,0] = 0.0
-    FCCshifts[3,1] = 0.5*FCCspacing
-    FCCshifts[3,2] = 0.5*FCCspacing
-   
-    a = 0
-    for i in range(nCellsPerSide):
-        latVec[0] = i*FCCspacing
-        for j in range(nCellsPerSide):
-            latVec[1] = j*FCCspacing
-            for k in range(nCellsPerSide):
-                latVec[2] = k*FCCspacing
-                for m in range(4):
-                    coords[a*DIM:(a+1)*DIM] = latVec + FCCshifts[m]
-                    if i == nCellsPerSide/2 and j == nCellsPerSide/2 and k == nCellsPerSide/2 and m == 1:
-                        MiddleAtomId = a
-                    a += 1
-            if not periodic:
-                # add in the remaining three faces
-                # pos-x face
-                latVec[0] = NCELLSPERSIDE*FCCspacing
-                latVec[1] = i*FCCspacing
-                latVec[2] = j*FCCspacing
-                coords[a*DIM:(a+1)*DIM] = latVec
-                a += 1
-                coords[a*DIM:(a+1)*DIM] = latVec + FCCshifts[3]
-                a += 1
-                # pos-y face
-                latVec[0] = i*FCCspacing
-                latVec[1] = NCELLSPERSIDE*FCCspacing
-                latVec[2] = j*FCCspacing
-                coords[a*DIM:(a+1)*DIM] = latVec
-                a += 1
-                coords[a*DIM:(a+1)*DIM] = latVec + FCCshifts[2]
-                a += 1
-                # pos-z face
-                latVec[0] = i*FCCspacing
-                latVec[1] = j*FCCspacing
-                latVec[2] = NCELLSPERSIDE*FCCspacing
-                coords[a*DIM:(a+1)*DIM] = latVec
-                a += 1
-                coords[a*DIM:(a+1)*DIM] = latVec + FCCshifts[1]
-                a += 1
-        if not periodic:
-            # add in the remaining three faces
-            # pos-x face
-            latVec[0] = i*FCCspacing
-            latVec[1] = NCELLSPERSIDE*FCCspacing
-            latVec[2] = NCELLSPERSIDE*FCCspacing
-            coords[a*DIM:(a+1)*DIM] = latVec
-            a += 1
-            # pos-y face
-            latVec[0] = NCELLSPERSIDE*FCCspacing
-            latVec[1] = i*FCCspacing
-            latVec[2] = NCELLSPERSIDE*FCCspacing
-            coords[a*DIM:(a+1)*DIM] = latVec
-            a += 1
-            # pos-z face
-            latVec[0] = NCELLSPERSIDE*FCCspacing
-            latVec[1] = NCELLSPERSIDE*FCCspacing
-            latVec[2] = i*FCCspacing
-            coords[a*DIM:(a+1)*DIM] = latVec
-            a += 1
-    if not periodic:
-        for n in range(DIM):
-            coords[a*DIM + n] = NCELLSPERSIDE*FCCspacing
-        a += 1
-
-    return MiddleAtomId
 
 def set_NeighborList(pkim, coords, numberOfAtoms, cutoff):
     cutoff2 = cutoff*2
-    neighbors = [[],]
+    neighbors = []
+    fneighbors = []
     for i in range(numberOfAtoms):
         neighbors.append([])
+        fneighbors.append([])
     for i in range(numberOfAtoms):
         for j in range(i+1, numberOfAtoms):
             dx = coords[i*DIM:i*DIM+DIM] - coords[j*DIM:j*DIM+DIM]
             dist = (dx**2).sum()
             if (dist < cutoff2):
-                # one-based list
-                neighbors[i+1].append(((j+1), dx))
+                # zero-based
+                fneighbors[j].append((i, dx))
                 # full list
-                neighbors[j+1].append(((i+1), dx))
+                neighbors[i].append((j,dx))
+
+    # merge list so that for each i, [neighbors(j>i), neighbors(j<i)]
+    for i in range(numberOfAtoms):
+        fneighbors[i] = neighbors[i] + fneighbors[i]
+
     #drop one for "zero"
-    NNeighbors = numpy.array([len(l) for l in neighbors[1:]], dtype='int32')
+    HalfNNeighbors = numpy.array([len(l) for l in neighbors], dtype='int32')
+    NNeighbors = numpy.array([len(l) for l in fneighbors], dtype='int32')
     neighborList = []
     RijList = []
-    for l in neighbors:
+    for l in fneighbors:
         neighs = [n for n,r in l]
         Rijs = [r for n,r in l]
         neighborList += neighs
         RijList += Rijs
     neighborList = numpy.array(neighborList, dtype='int32')
     RijList = numpy.array(RijList, dtype='double').flatten()
-    return NNeighbors, neighborList, RijList
+    return NNeighbors, HalfNNeighbors, neighborList, RijList
 
 testname = "test_python_openkim_virial"
 testf = open("test_python_openkim_virial.kim", "rt")
 teststring = "".join(testf.readlines())
 modelname = raw_input("Please enter a valid KIM model name:")
+
+coords_dump = numpy.fromfile('cu_coordinates.dump', sep=' ')
+coords_dump = coords_dump.reshape((len(coords_dump)/3, 3))
+NCLUSTERATOMS = len(coords_dump)
 
 #status, pkim = KIM_API_init(testname, modelname)
 status, pkim = KIM_API_init_str(teststring, modelname)
@@ -153,15 +62,10 @@ if KIM_STATUS_OK > status:
 cnt = 1
 try:
     KIM_API_allocate(pkim, NCLUSTERATOMS, ATYPES)
-    status = KIM_API_model_init(pkim)
-    if KIM_STATUS_OK > status:
-        raise kimservice.error("KIM_API_model_init")
-    status = neighborlist.set_kim_periodic_full_neigh(pkim)
-    status = virial.virial_init(pkim)
-    status = virial.set_virial(pkim)
-
+    #get everything pointers KIM
     numberOfAtoms = KIM_API_get_data_ulonglong(pkim, "numberOfAtoms")
     numberAtomTypes = KIM_API_get_data_int(pkim, "numberAtomTypes")
+    numberContributingAtoms=KIM_API_get_data_int(pkim,"numberContributingAtoms")
     atomTypes = KIM_API_get_data_int(pkim, "atomTypes")
     coordinates = KIM_API_get_data_double(pkim, "coordinates")
     cutoff = KIM_API_get_data_double(pkim, "cutoff")
@@ -172,16 +76,29 @@ try:
 
     # Set values
     numberOfAtoms[0] = NCLUSTERATOMS
-    numberAtomTypes = ATYPES
-    
-    atypecode = KIM_API_get_aTypeCode(pkim, "Ar")
+    numberContributingAtoms[0]=NCLUSTERATOMS
+    numberAtomTypes[0] = ATYPES
+
+    if KIM_STATUS_OK > status:
+        raise kimservice.error("KIM_API_model_init")
+    status = neighborlist.set_kim_periodic_full_neigh(pkim)
+    status = neighborlist.set_kim_periodic_half_neigh(pkim)
+
+    status = virial.virial_init(pkim)
+    status = virial.set_virial(pkim)
+
+    status = KIM_API_model_init(pkim)
+
+    atypecode = KIM_API_get_aTypeCode(pkim, "Cu")
     for i in range(numberOfAtoms[0]):
         atomTypes[i] = atypecode
     
-    MiddleAtomId = create_FCC_configuration(FCCSPACING, NCELLSPERSIDE, 0, coordinates)
-   
-    NNeighbors, neighborList, RijList = set_NeighborList(pkim, coordinates, numberOfAtoms[0], cutoff[0]*2)
-    neighborlist.set_neigh_object(pkim, NNeighbors, neighborList, RijList)
+    coordinates[:] = coords_dump.flatten()[:]
+
+    KIM_API_print(pkim)
+
+    NNeighbors, HalfNNeighbors, neighborList, RijList = set_NeighborList(pkim, coordinates, numberOfAtoms[0], cutoff[0]*4)
+    neighborlist.set_neigh_object(pkim, NNeighbors, HalfNNeighbors, neighborList, RijList)
 
     KIM_API_model_compute(pkim)
 except error:
