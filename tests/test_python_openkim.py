@@ -135,7 +135,7 @@ try:
 
     # Set values
     numberOfAtoms[0] = NCLUSTERATOMS
-    numberAtomTypes = ATYPES
+    numberAtomTypes[0] = ATYPES
     
     atypecode = KIM_API_get_aTypeCode(pkim, "Ar")
     for i in range(numberOfAtoms[0]):
