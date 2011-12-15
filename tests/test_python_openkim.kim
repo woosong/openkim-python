@@ -28,7 +28,7 @@ Ar                      spec                    18
 CONVENTIONS:
 # Name                  Type
 
-OneBasedLists           dummy
+ZeroBasedLists          dummy
 
 Neigh_BothAccess        dummy
 
