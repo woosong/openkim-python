@@ -32,7 +32,13 @@ ZeroBasedLists           dummy
 
 Neigh_BothAccess        dummy
 
+NEIGH-RVEC-H            dummy
+
 NEIGH-RVEC-F            dummy
+
+NEIGH-PURE-H            dummy
+
+NEIGH-PURE-F            dummy
 
 
 #######################################################################################################

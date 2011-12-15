@@ -113,33 +113,38 @@ def create_FCC_configuration(FCCspacing, nCellsPerSide, periodic, coords):
 
 def set_NeighborList(pkim, coords, numberOfAtoms, cutoff):
     cutoff2 = cutoff*2
-    # for One based
-    #neighbors = [[],]
     neighbors = []
+    fneighbors = []
     for i in range(numberOfAtoms):
         neighbors.append([])
+        fneighbors.append([])
     for i in range(numberOfAtoms):
         for j in range(i+1, numberOfAtoms):
             dx = coords[i*DIM:i*DIM+DIM] - coords[j*DIM:j*DIM+DIM]
             dist = (dx**2).sum()
             if (dist < cutoff2):
-                # one-based list +1 to indices
                 # zero-based
-                neighbors[i].append((j, dx))
+                fneighbors[j].append((i, dx))
                 # full list
-                neighbors[j].append((i, dx))
+                neighbors[i].append((j,dx))
+
+    # merge list so that for each i, [neighbors(j>i), neighbors(j<i)]
+    for i in range(numberOfAtoms):
+        fneighbors[i] = neighbors[i] + fneighbors[i]
+
     #drop one for "zero"
-    NNeighbors = numpy.array([len(l) for l in neighbors[0:]], dtype='int32')
+    HalfNNeighbors = numpy.array([len(l) for l in neighbors], dtype='int32')
+    NNeighbors = numpy.array([len(l) for l in fneighbors], dtype='int32')
     neighborList = []
     RijList = []
-    for l in neighbors:
+    for l in fneighbors:
         neighs = [n for n,r in l]
         Rijs = [r for n,r in l]
         neighborList += neighs
         RijList += Rijs
     neighborList = numpy.array(neighborList, dtype='int32')
     RijList = numpy.array(RijList, dtype='double').flatten()
-    return NNeighbors, neighborList, RijList
+    return NNeighbors, HalfNNeighbors, neighborList, RijList
 
 testname = "test_python_openkim_neigh"
 testf = open("test_python_openkim_neigh.kim", "rt")
@@ -168,20 +173,24 @@ try:
     energy = KIM_API_get_data_double(pkim, "energy")
     forces = KIM_API_get_data_double(pkim, "forces")
 
-    # Set values
+    # Set values 
+    
+    
     numberOfAtoms[0] = NCLUSTERATOMS
     numberAtomTypes = ATYPES
-    
+    KIM_API_print(pkim)
     atypecode = KIM_API_get_aTypeCode(pkim, "Ar")
     for i in range(numberOfAtoms[0]):
         atomTypes[i] = atypecode
     
     MiddleAtomId = create_FCC_configuration(FCCSPACING, NCELLSPERSIDE, 0, coordinates)
    
-    NNeighbors, neighborList, RijList = set_NeighborList(pkim, coordinates, numberOfAtoms[0], cutoff[0]*2)
-    neighborlist.set_neigh_object(pkim, NNeighbors, neighborList, RijList)
+    NNeighbors, HalfNNeighbors, neighborList, RijList = set_NeighborList(pkim, coordinates, numberOfAtoms[0], cutoff[0]*2)
+    neighborlist.set_neigh_object(pkim, NNeighbors, HalfNNeighbors, neighborList, RijList)
 
     KIM_API_model_compute(pkim)
+    
+
 except error:
     KIM_API_report_error(error.message,errno)
 
