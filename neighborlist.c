@@ -8,22 +8,29 @@ typedef struct
 {
    int iteratorId;
    int* NNeighbors;
+   int* HalfNNeighbors;
    int* neighborList;
    double* RijList;
 } NeighList;
 
 int get_periodic_neigh(void* kimmdl, int *mode, int *request, int* atom,
+                       int* numnei, int** nei1atom, double** Rij, int ishalf);
+
+int get_periodic_neigh_half(void* kimmdl, int *mode, int *request, int* atom,
+                       int* numnei, int** nei1atom, double** Rij);
+
+int get_periodic_neigh_full(void* kimmdl, int *mode, int *request, int* atom,
                        int* numnei, int** nei1atom, double** Rij);
 
 int get_cluster_neigh(void* kimmdl, int *mode, int *request, int* atom,
                       int* numnei, int** nei1atom, double** Rij);
 
 int set_kim_periodic_full_neigh(void* kimmdl) {
-    int status = KIM_API_set_data(kimmdl, "get_full_neigh", 1, (void*)&get_periodic_neigh);
+    int status = KIM_API_set_data(kimmdl, "get_full_neigh", 1, (void*)&get_periodic_neigh_full);
     return status;
 }
 int set_kim_periodic_half_neigh(void* kimmdl) {
-    int status = KIM_API_set_data(kimmdl, "get_half_neigh", 1, (void*)&get_periodic_neigh);
+    int status = KIM_API_set_data(kimmdl, "get_half_neigh", 1, (void*)&get_periodic_neigh_half);
     return status;
 }
 int set_kim_cluster_full_neigh(void* kimmdl) {
@@ -51,6 +58,7 @@ int free_neigh_object(void* pkim) {
         return KIM_STATUS_OK;
 
     safefree(nl->NNeighbors);
+    safefree(nl->HalfNNeighbors);
     safefree(nl->neighborList);
     safefree(nl->RijList);
     safefree(nl);
@@ -59,7 +67,7 @@ int free_neigh_object(void* pkim) {
     return status;
 }
 
-int set_neigh_object(void* kimmdl, int sz1, int* NNeighbors, int sz2, int* neighborList, int sz3, double* RijList) {
+int set_neigh_object(void* kimmdl, int sz1, int* NNeighbors, int sz2, int* HalfNNeighbors, int sz3, int* neighborList, int sz4, double* RijList) {
 //int set_neigh_object(void* kimmdl, int* NNeighbors, int* neighborList, double* RijList) {
     NeighList *nl;
     int status;
@@ -76,18 +84,30 @@ int set_neigh_object(void* kimmdl, int sz1, int* NNeighbors, int sz2, int* neigh
     nl->RijList = RijList;
     */
     nl->NNeighbors = (int*)malloc(sizeof(int)*sz1);
-    nl->neighborList = (int*)malloc(sizeof(int)*sz2);
-    nl->RijList = (double*)malloc(sizeof(double)*sz3);
+    nl->HalfNNeighbors = (int*)malloc(sizeof(int)*sz2);
+    nl->neighborList = (int*)malloc(sizeof(int)*sz3);
+    nl->RijList = (double*)malloc(sizeof(double)*sz4);
     memcpy(nl->NNeighbors, NNeighbors, sizeof(int)*sz1);
-    memcpy(nl->neighborList, neighborList, sizeof(int)*sz2);
-    memcpy(nl->RijList, RijList, sizeof(double)*sz3);
+    memcpy(nl->HalfNNeighbors, HalfNNeighbors, sizeof(int)*sz2);
+    memcpy(nl->neighborList, neighborList, sizeof(int)*sz3);
+    memcpy(nl->RijList, RijList, sizeof(double)*sz4);
     status = KIM_API_set_data(kimmdl, "neighObject", 1, nl);
     return status;
 }
 
+int get_periodic_neigh_half(void* kimmdl, int *mode, int *request, int* atom,
+        int* numnei, int** nei1atom, double** Rij) {
+   return get_periodic_neigh(kimmdl, mode, request, atom, numnei, nei1atom, Rij,1);
+}
+
+int get_periodic_neigh_full(void* kimmdl, int *mode, int *request, int* atom,
+        int* numnei, int** nei1atom, double** Rij) {
+   return get_periodic_neigh(kimmdl, mode, request, atom, numnei, nei1atom, Rij,0);
+}
+
 /* Define prototypes */
 int get_periodic_neigh(void* kimmdl, int *mode, int *request, int* atom,
-                       int* numnei, int** nei1atom, double** Rij)
+                       int* numnei, int** nei1atom, double** Rij, int ishalf)
 {
    /* local variables */
    intptr_t* pkim = *((intptr_t**) kimmdl);
@@ -157,8 +177,7 @@ int get_periodic_neigh(void* kimmdl, int *mode, int *request, int* atom,
    *atom = atomToReturn;
 
    /* set the returned number of neighbors for the returned atom */
-   //*numnei = *((*nl).NNeighbors);
-   *numnei = (*nl).NNeighbors[*atom];
+   *numnei = ishalf ? (*nl).HalfNNeighbors[*atom] : (*nl).NNeighbors[*atom];
 
    /* set the location for the returned neighbor list */
    *nei1atom = (*nl).neighborList;
