@@ -1,4 +1,5 @@
 import numpy
+import pylab
 from kimservice import *
 
 FCCSPACING = 5.260
@@ -119,15 +120,14 @@ modelname = raw_input("Please enter a valid KIM model name:")
 status, pkim = KIM_API_init_str(teststring, modelname)
 if KIM_STATUS_OK > status:
     KIM_API_report_error('KIM_API_init',status)
-
 try:
     KIM_API_allocate(pkim, NCLUSTERATOMS, ATYPES)
     status = KIM_API_model_init(pkim)
     if KIM_STATUS_OK > status:
         raise kimservice.error("KIM_API_model_init")
-    numberOfAtoms = KIM_API_get_data_ulonglong(pkim, "numberOfAtoms")
-    numberAtomTypes = KIM_API_get_data_int(pkim, "numberAtomTypes")
-    atomTypes = KIM_API_get_data_int(pkim, "atomTypes")
+    numberOfAtoms = KIM_API_get_data_ulonglong(pkim, "numberOfParticles")
+    numberAtomTypes = KIM_API_get_data_int(pkim, "numberParticleTypes")
+    atomTypes = KIM_API_get_data_int(pkim, "particleTypes")
     coordinates = KIM_API_get_data_double(pkim, "coordinates")
     cutoff = KIM_API_get_data_double(pkim, "cutoff")
     energy = KIM_API_get_data_double(pkim, "energy")
@@ -137,13 +137,16 @@ try:
     numberOfAtoms[0] = NCLUSTERATOMS
     numberAtomTypes[0] = ATYPES
     
-    atypecode = KIM_API_get_aTypeCode(pkim, "Ar")
+    #atypecode = KIM_API_get_aTypeCode(pkim, "Ar")
+    atypecode = KIM_API_get_partcl_type_code(pkim, "Ar")
+    
     for i in range(numberOfAtoms[0]):
         atomTypes[i] = atypecode
     
     MiddleAtomId = create_FCC_configuration(FCCSPACING, NCELLSPERSIDE, 0, coordinates)
-    
     KIM_API_model_compute(pkim)
+     
+    print "computed"
 except error:
     KIM_API_report_error(error.message,errno)
 
@@ -163,5 +166,4 @@ try:
     KIM_API_free(pkim)
 except error:
     KIM_API_report_error(error.message,errno)
-
 

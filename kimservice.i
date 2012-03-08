@@ -38,14 +38,14 @@ import_array();
 %apply (double* IN_ARRAY1, int DIM1) {(double* seq, int n)};
 
 %{
-#include "KIMserviceC.h"
-#include "KIMstatus.h"
+#include "KIM_API_C.h"
+#include "KIM_API_status.h"
 typedef void* voidp;
 int KIM_API_init_python(void **pkimmdl, char *testname, char *modelname) {
     return KIM_API_init((void*)pkimmdl, testname, modelname);
 };
 int KIM_API_init_python_str(void **pkimmdl, char *teststring, char *modelname) {
-    return KIM_API_init_str_testname((void*)pkimmdl, teststring, modelname);
+    return KIM_API_string_init((void*)pkimmdl, teststring, modelname);
 };
 void KIM_API_free_python(void **pkimmdl, int *error) {
     KIM_API_free((void*)pkimmdl, error);
@@ -76,8 +76,8 @@ int KIM_API_set_data_dtype(void *kimmdl, char *nm,int size, T *dt);
 %include "cpointer.i"
 %typedef void* voidp;
 %pointer_functions(voidp, voidpp);
-%include "KIMserviceC.h"
-%include "KIMstatus.h"
+%include "KIM_API_C.h"
+%include "KIM_API_status.h"
 
 int KIM_API_init_python(void **pkimmdl, char *testname, char *modelname);
 %pythoncode %{

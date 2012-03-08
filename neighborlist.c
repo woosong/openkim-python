@@ -1,5 +1,5 @@
-#include "KIMserviceC.h"
-#include "KIMstatus.h"
+#include "KIM_API_status.h"
+#include "KIM_API_C.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -159,8 +159,8 @@ int get_periodic_neigh(void* kimmdl, int *mode, int *request, int* atom,
        // use zero based
       if ((*request >= *numberOfAtoms) || (*request < 0)) /* invalid id */
       {
-         KIM_API_report_error(__LINE__, __FILE__,"Invalid atom ID in get_periodic_neigh", KIM_STATUS_ATOM_INVALID_ID);
-         return KIM_STATUS_ATOM_INVALID_ID;
+         KIM_API_report_error(__LINE__, __FILE__,"Invalid atom ID in get_periodic_neigh", KIM_STATUS_PARTICLE_INVALID_ID);
+         return KIM_STATUS_PARTICLE_INVALID_ID;
       }
       else
       {
@@ -247,8 +247,8 @@ int get_cluster_neigh(void* kimmdl, int *mode, int *request, int* atom,
    {
       if ((*request >= *numberOfAtoms) || (*request < 0)) /* invalid id */
       {
-         KIM_API_report_error(__LINE__, __FILE__,"Invalid atom ID in get_cluster_neigh", KIM_STATUS_ATOM_INVALID_ID);
-         return KIM_STATUS_ATOM_INVALID_ID;
+         KIM_API_report_error(__LINE__, __FILE__,"Invalid atom ID in get_cluster_neigh", KIM_STATUS_PARTICLE_INVALID_ID);
+         return KIM_STATUS_PARTICLE_INVALID_ID;
       }
       else
       {
