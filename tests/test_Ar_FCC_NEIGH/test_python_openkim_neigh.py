@@ -160,10 +160,10 @@ cnt = 1
 try:
     KIM_API_allocate(pkim, NCLUSTERATOMS, ATYPES)
 
-    numberOfAtoms = KIM_API_get_data_ulonglong(pkim, "numberOfAtoms")
-    numberAtomTypes = KIM_API_get_data_int(pkim, "numberAtomTypes")
-    numberContributingAtoms=KIM_API_get_data_int(pkim,"numberContributingAtoms")
-    atomTypes = KIM_API_get_data_int(pkim, "atomTypes")
+    numberOfAtoms = KIM_API_get_data_ulonglong(pkim, "numberOfParticles")
+    numberAtomTypes = KIM_API_get_data_int(pkim, "numberParticleTypes")
+    numberContributingAtoms=KIM_API_get_data_int(pkim,"numberContributingParticles")
+    atomTypes = KIM_API_get_data_int(pkim, "particleTypes")
     coordinates = KIM_API_get_data_double(pkim, "coordinates")
     cutoff = KIM_API_get_data_double(pkim, "cutoff")
     energy = KIM_API_get_data_double(pkim, "energy")
@@ -180,10 +180,10 @@ try:
     import neighborlist
     status = neighborlist.set_kim_periodic_full_neigh(pkim)
     status = neighborlist.set_kim_periodic_half_neigh(pkim)
-
+    
     KIM_API_print(pkim)
 
-    atypecode = KIM_API_get_aTypeCode(pkim, "Ar")
+    atypecode = KIM_API_get_partcl_type_code(pkim, "Ar")
     for i in range(numberOfAtoms[0]):
         atomTypes[i] = atypecode
     
@@ -191,7 +191,7 @@ try:
    
     NNeighbors, HalfNNeighbors, neighborList, RijList = set_NeighborList(pkim, coordinates, numberOfAtoms[0], cutoff[0]*2)
     neighborlist.set_neigh_object(pkim, NNeighbors, HalfNNeighbors, neighborList, RijList)
-
+    
     KIM_API_model_compute(pkim)
 
 except error:

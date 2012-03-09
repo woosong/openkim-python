@@ -26,19 +26,19 @@ int get_cluster_neigh(void* kimmdl, int *mode, int *request, int* atom,
                       int* numnei, int** nei1atom, double** Rij);
 
 int set_kim_periodic_full_neigh(void* kimmdl) {
-    int status = KIM_API_set_data(kimmdl, "get_full_neigh", 1, (void*)&get_periodic_neigh_full);
+    int status = KIM_API_set_data(kimmdl, "get_neigh", 1, (void*)&get_periodic_neigh_full);
     return status;
 }
 int set_kim_periodic_half_neigh(void* kimmdl) {
-    int status = KIM_API_set_data(kimmdl, "get_half_neigh", 1, (void*)&get_periodic_neigh_half);
+    int status = KIM_API_set_data(kimmdl, "get_neigh", 1, (void*)&get_periodic_neigh_half);
     return status;
 }
 int set_kim_cluster_full_neigh(void* kimmdl) {
-    int status = KIM_API_set_data(kimmdl, "get_full_neigh", 1, (void*)&get_cluster_neigh);
+    int status = KIM_API_set_data(kimmdl, "get_neigh", 1, (void*)&get_cluster_neigh);
     return status;
 }
 int set_kim_cluster_half_neigh(void* kimmdl) {
-    int status = KIM_API_set_data(kimmdl, "get_half_neigh", 1, (void*)&get_cluster_neigh);
+    int status = KIM_API_set_data(kimmdl, "get_neigh", 1, (void*)&get_cluster_neigh);
     return status;
 }
 
@@ -121,7 +121,7 @@ int get_periodic_neigh(void* kimmdl, int *mode, int *request, int* atom,
    *numnei = 0;
 
    /* unpack neighbor list object */
-   numberOfAtoms = (int*) KIM_API_get_data(pkim, "numberOfAtoms", &status);
+   numberOfAtoms = (int*) KIM_API_get_data(pkim, "numberOfParticles", &status);
    if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
 
    nl = (NeighList*) KIM_API_get_data(pkim, "neighObject", &status);
@@ -211,7 +211,7 @@ int get_cluster_neigh(void* kimmdl, int *mode, int *request, int* atom,
    *numnei = 0;
 
    /* unpack neighbor list object */
-   numberOfAtoms = (int*) KIM_API_get_data(pkim, "numberOfAtoms", &status);
+   numberOfAtoms = (int*) KIM_API_get_data(pkim, "numberOfParticles", &status);
    if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
 
    nl = (NeighList*) KIM_API_get_data(pkim, "neighObject", &status);

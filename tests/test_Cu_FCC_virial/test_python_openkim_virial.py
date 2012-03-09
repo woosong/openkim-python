@@ -63,16 +63,16 @@ cnt = 1
 try:
     KIM_API_allocate(pkim, NCLUSTERATOMS, ATYPES)
     #get everything pointers KIM
-    numberOfAtoms = KIM_API_get_data_ulonglong(pkim, "numberOfAtoms")
-    numberAtomTypes = KIM_API_get_data_int(pkim, "numberAtomTypes")
-    numberContributingAtoms=KIM_API_get_data_int(pkim,"numberContributingAtoms")
-    atomTypes = KIM_API_get_data_int(pkim, "atomTypes")
+    numberOfAtoms = KIM_API_get_data_ulonglong(pkim, "numberOfParticles")
+    numberAtomTypes = KIM_API_get_data_int(pkim, "numberParticleTypes")
+    numberContributingAtoms=KIM_API_get_data_int(pkim,"numberContributingParticles")
+    atomTypes = KIM_API_get_data_int(pkim, "particleTypes")
     coordinates = KIM_API_get_data_double(pkim, "coordinates")
     cutoff = KIM_API_get_data_double(pkim, "cutoff")
     energy = KIM_API_get_data_double(pkim, "energy")
     forces = KIM_API_get_data_double(pkim, "forces")
-    virialGlobal = KIM_API_get_data_double(pkim, "virialGlobal")
-    virialPerAtom = KIM_API_get_data_double(pkim, "virialPerAtom")
+    virialGlobal = KIM_API_get_data_double(pkim, "virial")
+    #virialPerAtom = KIM_API_get_data_double(pkim, "particleVirial")
 
     # Set values
     numberOfAtoms[0] = NCLUSTERATOMS
@@ -89,7 +89,7 @@ try:
 
     status = KIM_API_model_init(pkim)
 
-    atypecode = KIM_API_get_aTypeCode(pkim, "Cu")
+    atypecode = KIM_API_get_partcl_type_code(pkim, "Ar")
     for i in range(numberOfAtoms[0]):
         atomTypes[i] = atypecode
     
@@ -115,7 +115,7 @@ for i in range(numberOfAtoms[0]):
 print ""
 print "Energy = %20.15e" %  energy[0]
 
-print virialGlobal, virialPerAtom
+print virialGlobal#, virialPerAtom
 
 try:
     KIM_API_model_destroy(pkim)

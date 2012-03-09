@@ -1,5 +1,5 @@
-#include "KIMserviceC.h"
-#include "KIMstatus.h"
+#include "KIM_API_C.h"
+#include "KIM_API_status.h"
 #include "virial.h"
 #include <stdlib.h>
 #include <string.h>
@@ -18,19 +18,19 @@ int virial_init(void *pkim){
     virialPerAtom_flag =0;
     int ierGlobal,ierPerAtom, kimerr;
     int i;
-    virialGlobal = (double *) KIM_API_get_data(pkim, "virialGlobal",&ierGlobal);
-    virialPerAtom = (double *) KIM_API_get_data(pkim, "virialPerAtom",&ierPerAtom);
-    numberOfAtoms = (int *) KIM_API_get_data(pkim, "numberOfAtoms",&kimerr);
+    virialGlobal = (double *) KIM_API_get_data(pkim, "virial",&ierGlobal);
+    virialPerAtom = (double *) KIM_API_get_data(pkim, "particleVirial",&ierPerAtom);
+    numberOfAtoms = (int *) KIM_API_get_data(pkim, "numberOfParticles",&kimerr);
     //halfNeighbors = !pkim->requiresFullNeighbors();
 
     if (kimerr !=KIM_STATUS_OK) return kimerr;
     if (ierGlobal == KIM_STATUS_OK && virialGlobal != NULL) {
-        virialGlobal_flag = KIM_API_isit_compute(pkim, "virialGlobal", &kimerr);
+        virialGlobal_flag = KIM_API_get_compute(pkim, "virial", &kimerr);
         if (virialGlobal_flag==1 && virialGlobal_need2add) *virialGlobal =0.0;
     }
 
     if (ierPerAtom == KIM_STATUS_OK && virialPerAtom != NULL) {
-        virialPerAtom_flag = KIM_API_isit_compute(pkim, "virialPerAtom", &kimerr);
+        virialPerAtom_flag = KIM_API_get_compute(pkim, "particleVirial", &kimerr);
         if (virialPerAtom_flag==1 && virialPerAtom_need2add) {
             for (i =0;i<(*numberOfAtoms)*6 ;i++) virialPerAtom[i]=0.0;
         }
@@ -41,7 +41,7 @@ int virial_init(void *pkim){
 
 int set_virial(void* pkim) {
     int status;
-    status = KIM_API_set_data(pkim, "process_d1Edr", 1, (void*) &process_d1Edr);
+    status = KIM_API_set_data(pkim, "process_dEdr", 1, (void*) &process_d1Edr);
     return status;
 }
 

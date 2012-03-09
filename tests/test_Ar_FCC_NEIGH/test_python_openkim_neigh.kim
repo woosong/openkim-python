@@ -14,7 +14,12 @@
 
 
 TEST_NAME := test_python_openkim_neigh
-SystemOfUnitsFix := fixed
+Unit_handling    := fixed
+Unit_length      := A
+Unit_energy      := eV
+Unit_charge      := e
+Unit_temperature := K
+Unit_time        := fs
 
 
 #######################################################################################################
@@ -28,46 +33,48 @@ Ar                      spec                    18
 CONVENTIONS:
 # Name                  Type
 
-ZeroBasedLists           dummy
+ZeroBasedLists           flag
 
-Neigh_BothAccess        dummy
+Neigh_BothAccess        flag
 
-NEIGH-RVEC-H            dummy
+NEIGH_RVEC_F            flag
 
-NEIGH-RVEC-F            dummy
+NEIGH_PURE_H            flag
 
-NEIGH-PURE-H            dummy
-
-NEIGH-PURE-F            dummy
+NEIGH_PURE_F            flag
 
 
 #######################################################################################################
 MODEL_INPUT:
-# Name                  Type         Unit       SystemU/Scale           Shape              Requirements
+# Name                  Type         Unit               Shape              Requirements
 
-numberOfAtoms           integer      none       none                    []
+numberOfParticles           integer      none          []
 
-numberAtomTypes         integer      none       none                    []
+numberParticleTypes         integer      none          []
 
-atomTypes               integer      none       none                    [numberOfAtoms]
+particleTypes               integer      none          [numberOfParticles]
 
-coordinates             real*8       length     standard                [numberOfAtoms,3]
+coordinates                 real*8       length        [numberOfParticles,3]
 
-get_full_neigh          method       none       none                    []
+get_neigh                   method       none          []
 
-neighObject             pointer      none       none                    []
+neighObject                 pointer      none          []
+
+numberContributingParticles integer      none          []                  optional
 
 
 #######################################################################################################
 MODEL_OUTPUT:
-# Name                  Type         Unit       SystemU/Scale           Shape              Requirements
+# Name                  Type         Unit            Shape              Requirements
 
-destroy                 method       none       none                    []
+destroy                 method       none            []
 
-compute                 method       none       none                    []
+compute                 method       none            []
 
-cutoff                  real*8       length     standard                []
+cutoff                  real*8       length          []
 
-energy                  real*8       energy     standard                []
+energy                  real*8       energy          []
 
-forces                  real*8       force      standard                [numberOfAtoms,3]
+forces                  real*8       force           [numberOfAtoms,3]
+
+reinit                  method       none            []
