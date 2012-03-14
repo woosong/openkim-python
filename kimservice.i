@@ -190,7 +190,6 @@ int KIM_API_set_data_single_intptr_tp(void *kimmdl,char *nm,intptr_t *p);
 %pythoncode %{
 import inspect
 
-/* report errors using file and line number */
 def KIM_API_report_error(usermsg, ier):
     istack = inspect.stack()[1]
     errline = istack[2]
