@@ -92,6 +92,9 @@ int KIM_API_init_python(void **pkimmdl, char *testname, char *modelname) {
 int KIM_API_init_python_str(void **pkimmdl, char *teststring, char *modelname) {
     return KIM_API_string_init((void*)pkimmdl, teststring, modelname);
 };
+int KIM_API_model_info_python(void **pmdl, char *modelname){
+    return KIM_API_model_info((void*)pmdl, modelname);
+};
 void KIM_API_free_python(void **pkimmdl, int *error) {
     KIM_API_free((void*)pkimmdl, error);
 };
@@ -149,6 +152,14 @@ def KIM_API_init_str(teststring, modelname):
     status = KIM_API_init_python_str(ppkim, teststring, modelname)
     pkim = voidpp_value(ppkim)
     return (status, pkim) 
+%}
+int KIM_API_model_info_python(void **pmdl, char *modelname);
+%pythoncode %{
+def KIM_API_model_info(modelname):
+    ppmdl = new_voidpp()
+    status = KIM_API_model_info_python(ppmdl, modelname)
+    pmdl = voidpp_value(ppmdl)
+    return (status, pmdl)
 %}
 void KIM_API_free_python(void **pkimmdl, int *error);
 %pythoncode %{

@@ -22,19 +22,20 @@ int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
               int* numnei, int** nei1atom, double** Rij);
 
 int initialize(void* kimmdl) {
-    int status = KIM_API_set_data(kimmdl, "get_neigh", 1, (void*)&get_neigh);
-    if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__, "get numberOfParticles", status);
-    
-    int *natoms = (int*)KIM_API_get_data(kimmdl, "numberOfParticles", &status);
-    if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__, "get numberOfParticles", status);
+    int status;
 
+    // setup a blank neighborlist
     NeighList *nl = (NeighList*)malloc(sizeof(NeighList));
-    nl->NNeighbors = (int*)malloc(sizeof(int)*(*natoms));
-    nl->HalfNNeighbors = (int*)malloc(sizeof(int)*(*natoms));
-    nl->neighborList = (int*)malloc(sizeof(int)*(*natoms));
-    nl->RijList = (double*)malloc(sizeof(int)*(*natoms));
+    nl->NNeighbors     = (int*)malloc(sizeof(int)*1);
+    nl->HalfNNeighbors = (int*)malloc(sizeof(int)*1);
+    nl->neighborList   = (int*)malloc(sizeof(int)*1);
+    nl->RijList        = (double*)malloc(sizeof(double)*1);
+    nl->iteratorId     = -1;
+
     status = KIM_API_set_data(kimmdl, "neighObject", 1, nl);
- 
+    status = KIM_API_set_data(kimmdl, "get_neigh", 1, (void*)&get_neigh);
+    if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__, "get numberOfParticles", status);
+  
     return status;
 }
 
@@ -82,16 +83,12 @@ int set_neigh_object(void* kimmdl, int sz1, int* NNeighbors,
     };
     nl = (NeighList *)malloc(sizeof(NeighList));
 
-    nl->iteratorId = -1;
-    /*
-    nl->NNeighbors = NNeighbors;
-    nl->neighborList = neighborList;
-    nl->RijList = RijList;
-    */
-    nl->NNeighbors = (int*)malloc(sizeof(int)*sz1);
+    nl->iteratorId     = -1;
+    nl->NNeighbors     = (int*)malloc(sizeof(int)*sz1);
     nl->HalfNNeighbors = (int*)malloc(sizeof(int)*sz2);
-    nl->neighborList = (int*)malloc(sizeof(int)*sz3);
-    nl->RijList = (double*)malloc(sizeof(double)*sz4);
+    nl->neighborList   = (int*)malloc(sizeof(int)*sz3);
+    nl->RijList        = (double*)malloc(sizeof(double)*sz4);
+    
     memcpy(nl->NNeighbors, NNeighbors, sizeof(int)*sz1);
     memcpy(nl->HalfNNeighbors, HalfNNeighbors, sizeof(int)*sz2);
     memcpy(nl->neighborList, neighborList, sizeof(int)*sz3);
@@ -133,14 +130,9 @@ int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
    /* figure out the neighbor locator type */
    method = KIM_API_get_NBC_method(pkim, &status);
    if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
-
-   if (!strcmp(method, "CLUSTER"))
-        cluster = 1;
-   if (!strcmp(method, "NEIGH_PURE_H"))
-        ishalf = 1;
-   if (!strcmp(method, "MI_OPBC_H"))
-        ishalf = 1;
-
+   if (!strcmp(method, "CLUSTER"))      cluster = 1;
+   if (!strcmp(method, "NEIGH_PURE_H")) ishalf = 1;
+   if (!strcmp(method, "MI_OPBC_H"))    ishalf = 1;
    safefree(method);
 
    /* check mode and request */
@@ -232,6 +224,7 @@ int build_neighborlist_allall(void *kimmdl)
     double* coords;
     double* cutoff;
     char *method;
+    double *boxSideLengths;
     NeighList *nl;
  
     int periodic = 0;
@@ -241,37 +234,28 @@ int build_neighborlist_allall(void *kimmdl)
     /* get the preferred neighborlist style from the API */
     method = KIM_API_get_NBC_method(kimmdl, &status);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
-
-    if (strcmp(method, "NEIGH_PURE_H") == 0)
-        ishalf = 1;
-    if (!strcmp(method, "MI_OPBC_F"))
-        periodic = 1;
-    if (!strcmp(method, "NEIGH_RVEC_F"))
-        rijlist = 1;
-    if (!strcmp(method, "MI_OPBC_H")){
-        ishalf = 1;
-        periodic = 1;
-    }    
+    if (!strcmp(method, "NEIGH_PURE_H"))  ishalf = 1;
+    if (!strcmp(method, "MI_OPBC_F"))     periodic = 1;
+    if (!strcmp(method, "NEIGH_RVEC_F"))  rijlist = 1;
+    if (!strcmp(method, "MI_OPBC_H")){    ishalf = 1;   periodic = 1; }    
     safefree(method);
 
     /* get the data necessary for the neighborlist */
-    KIM_API_getm_data(kimmdl, &status, 3*3,
+    KIM_API_getm_data(kimmdl, &status, 4*3,
             "numberOfParticles",    &numberOfParticles,     1,
             "coordinates",          &coords,                1,
-            "cutoff",               &cutoff,                1);
+            "cutoff",               &cutoff,                1,
+            "boxSideLengths",       &boxSideLengths,        periodic);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__, "KIM_API_getm_data", status);
 
-    /* get the box side lengths if applicable */
-    double *boxSideLengths = 0;
-    if (periodic){
-        boxSideLengths = (double*)KIM_API_get_data(kimmdl, "boxSideLengths", &status);
-        if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__, "boxside", status);
-    }
+    /* reset the NeighList object to refill */
+    free_neigh_object(kimmdl);
+    nl = (NeighList*)malloc(sizeof(NeighList));
+    nl->iteratorId     = -1;
+    nl->NNeighbors     = (int*)malloc(sizeof(int)*(*numberOfParticles));
+    nl->HalfNNeighbors = (int*)malloc(sizeof(int)*(*numberOfParticles));
 
-    /* unpack neighbor list object */
-    nl = (NeighList*) KIM_API_get_data(kimmdl, "neighObject", &status);
-    if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
-
+    /* begin the actual neighborlist calculation */
     int i, j, k, a;
     double dx[3];
     double r2;
@@ -329,11 +313,8 @@ int build_neighborlist_allall(void *kimmdl)
         total += a;
     }
 
-    safefree(nl->neighborList);
-    safefree(nl->RijList);
-    
     nl->neighborList = (int*)malloc(sizeof(int)*total);
-    nl->RijList = (double*)malloc(sizeof(double)*total*3);
+    nl->RijList      = (double*)malloc(sizeof(double)*total*3);
 
     int iter = 0;
     for (i=0; i<*numberOfParticles; i++){
@@ -350,6 +331,8 @@ int build_neighborlist_allall(void *kimmdl)
 
     safefree(temp_neigh);
     safefree(temp_rij);
+    
+    status = KIM_API_set_data(kimmdl, "neighObject", 1, nl);
 
     return status;
 }
