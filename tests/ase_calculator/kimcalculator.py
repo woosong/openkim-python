@@ -12,88 +12,155 @@
 #  Notes for work in progress:
 #      1. name pointers to KIM with "km_" 
 #      2. need info on neighbor list
-#      3. for certain models need particleSize and particleCharge 
-#  
+#      3. should write a calculation_required function
+#       
 
 from kimservice import *
 import neighborlist as kimnl
-
+from kimscriptmaker import makekimscript, checkIndex
+import numpy
+import time
 
 class KIM_Calculator:
 
-    def __init__(self,modelname):
+    def __init__(self,modelname, cellLocator=True):
         # correctly set up the .kim file so that is matches that
         # of modelname, i.e. will run any types
-        self.tname = "test_ase_kim"
-        self.testf = open("test_ase_kim.kim", "rt")
-        self.teststring = "".join(self.testf.readlines())
+        self.testname = "test_"+modelname
+        self.teststring = None
 
-        self.modelname = modelname
-        status, self.pkim = KIM_API_init_str(self.teststring, self.modelname)
+        self.modelname = modelname 
+        status, km_pmdl = KIM_API_model_info(modelname)
         if KIM_STATUS_OK > status:
-            KIM_API_report_error('KIM_API_init',status)
-        
-        # We need to create a string that matches the capabilities
-        # of the test that we wish to use.  We don't need to grab 
-        # anything, really, but accomodate anything.  
-        #status, self.pmdl = KIM_API_model_info(self.modelname)        
+            KIM_API_report_error('KIM_API_model_info',status)
+            raise InitializationError(self.modelname)
+        km_pmdl = 0
 
+        self.cellLocator = cellLocator
+
+        # initialize pointers for kim
         self.km_numberOfAtoms  = None
+        self.km_particleCharge = None
         self.km_energy         = None
         self.km_forces         = None
         self.km_particleEnergy = None
         self.km_virial         = None
         self.km_particleVirial = None
         self.km_hessian        = None
+        
+        # initialize ase atoms specifications 
+        self.pbc = None
+        self.cell = None
+        self.cell_orthogonal = None
+
+    def makeTestString(self,atoms):
+        """
+        makes string if it doesn't exist, if exists just keeps it as is
+        """
+        if self.teststring is None or self.cell_BC_changed(atoms):
+            self.teststring = makekimscript(self.modelname,self.testname,atoms)
+
+
+    def cell_BC_changed(self,atoms):
+        """
+        this function is to check whether BC has changed and cell orthogonality has changed
+        because we might want to change neighbor list generator method
+        """
+        cell_orthogonal = ((abs(numpy.dot(atoms.get_cell()[0],atoms.get_cell()[1])) + abs(numpy.dot(atoms.get_cell()[0],atoms.get_cell()[2])) + abs(numpy.dot(atoms.get_cell()[1],atoms.get_cell()[2])))<10**(-8))
+        if (self.pbc != atoms.get_pbc()).any() or self.cell_orthogonal != cell_orthogonal:
+            return True
+        else:
+            return False
+
+    def calculation_required2(self,atoms):
+        """
+        this checks whether or not the atoms configuration has changed and we need to recalculate..
+        """
+        return (self.km_energy is None or \
+                (self.km_numberOfAtoms != atoms.get_number_of_atoms()) or \
+                (self.km_atomTypes[:] != atoms.get_atomic_numbers()).any() or \
+                (self.km_coordinates[:] != atoms.get_positions().flatten()).any() or \
+                (self.pbc != atoms.get_pbc()).any() or \
+                (self.cell != atoms.get_cell()).any())
+
 
     def update(self,atoms):
         """
         here we connect the KIM pointers to values in the ase atoms class
         """
+
+        # here we only reinitialize the model if the number of Atoms / types of atoms have changed, or if the model is uninitialized
         natoms = atoms.get_number_of_atoms()
         ntypes = len(set(atoms.get_atomic_numbers()))
-        
-        if self.km_numberOfAtoms != natoms:
-            KIM_API_free(self.pkim)
+
+        if self.km_numberOfAtoms != natoms or self.km_numberAtomTypes != ntypes or cell_BC_changed:
+            self.makeTestString(atoms)
             status, self.pkim = KIM_API_init_str(self.teststring, self.modelname)
+            if KIM_STATUS_OK > status:
+                KIM_API_report_error('KIM_API_init',status)
+                raise InitializationError(self.modelname)
+        
             KIM_API_allocate(self.pkim, natoms, ntypes)
             kimnl.initialize(self.pkim)
             KIM_API_model_init(self.pkim)
+    
+            # get pointers to model inputs
+            self.km_numberOfAtoms      = KIM_API_get_data_ulonglong(self.pkim, "numberOfParticles")
+            self.km_numberAtomTypes    = KIM_API_get_data_int(self.pkim, "numberParticleTypes")
+            self.km_atomTypes          = KIM_API_get_data_int(self.pkim, "particleTypes")
+            self.km_coordinates        = KIM_API_get_data_double(self.pkim, "coordinates")
+            if checkIndex(self.pkim,"particleCharge") >= 0:
+                self.km_particleCharge = KIM_API_get_data_double(self.pkim,"particleCharge")
+            if checkIndex(self.pkim, "particleSize") >= 0:
+                self.km_particleSize = KIM_API_get_data_double(self.pkim,"particleSize")
+                print "WARNING: ASE atoms do not have particle sizes"
+    
+            # check what the model calculates and get model outputs
+            if checkIndex(self.pkim,"energy") >= 0:
+                self.km_energy = KIM_API_get_data_double(self.pkim, "energy")
+            if checkIndex(self.pkim,"forces") >= 0:
+                self.km_forces = KIM_API_get_data_double(self.pkim, "forces")
+            if checkIndex(self.pkim, "particleEnergy") >= 0:
+                self.km_particleEnergy = KIM_API_get_data_double(self.pkim, "particleEnergy")
+            if checkIndex(self.pkim, "virial") >=0:
+                self.km_virial = KIM_API_get_data_double(self.pkim, "virial")
+            if checkIndex(self.pkim, "particleVirial") >=0:
+                self.km_particleVirial = KIM_API_get_data_double(self.pkim, "particleVirial")
+            if checkIndex(self.pkim, "hessian")>=0:
+                self.km_hessian = KIM_API_get_data_double(self.pkim, "hessian")
+                        
+        if self.calculation_required2(atoms):
+            # if the calculation is required we proceed to set the values of the standard things each model and atom class has
+            self.km_numberOfAtoms[0]   = natoms 
+            self.km_numberAtomTypes[0] = ntypes
+            self.km_coordinates[:]     = atoms.get_positions().flatten()
+            if self.km_particleCharge is not None:
+                km_particleCharge[:] = atoms.get_charges()       
  
-        # we proceed to set the values of the standard things each model and atom class has
-        self.km_numberOfAtoms      = KIM_API_get_data_ulonglong(self.pkim, "numberOfParticles")
-        self.km_numberAtomTypes    = KIM_API_get_data_int(self.pkim, "numberParticleTypes")
-        self.km_atomTypes          = KIM_API_get_data_int(self.pkim, "particleTypes")
-        self.km_coordinates        = KIM_API_get_data_double(self.pkim, "coordinates")
-        self.km_numberOfAtoms[0]   = natoms 
-        self.km_numberAtomTypes[0] = ntypes
-        self.km_coordinates[:]     = atoms.get_positions().flatten()
-        
-        # fill the proper chemical identifiers 
-        symbols = atoms.get_chemical_symbols()
-        for i in range(natoms):
-            self.km_atomTypes[i] = KIM_API_get_partcl_type_code(self.pkim, symbols[i])
-        
-        # build the neighborlist (not a cell-based, type depends on model)
-        #kimnl.build_neighborlist_allall(self.pkim)
+            # fill the proper chemical identifiers 
+            symbols = atoms.get_chemical_symbols()
+            for i in range(natoms):
+                self.km_atomTypes[i] = KIM_API_get_partcl_type_code(self.pkim, symbols[i])
+            
+            # build the neighborlist (not a cell-based, type depends on model)
+            print KIM_API_get_NBC_method(self.pkim)
+            neigh_start = time.time()
+            kimnl.set_cell(atoms.get_cell().flatten(), atoms.get_pbc().flatten().astype('int8'))
+            if self.cellLocator == True:
+                kimnl.build_neighborlist(self.pkim)
+            else:
+                kimnl.build_neighborlist_allall(self.pkim)
 
-        # check if model calculates energies, forces, virials
-        if KIM_API_get_compute(self.pkim,"energy"):
-            self.km_energy = KIM_API_get_data_double(self.pkim, "energy")
-        if KIM_API_get_compute(self.pkim,"forces"):
-            self.km_forces = KIM_API_get_data_double(self.pkim, "forces")
-        if KIM_API_get_compute(self.pkim, "particleEnergy"):
-            self.km_particleEnergy = KIM_API_get_data_double(self.pkim, "particleEnergy")
-        if KIM_API_get_compute(self.pkim, "virial"):
-            self.km_virial = KIM_API_get_data_double(self.pkim, "virial")
-        """
-        if KIM_API_get_compute(self.pkim, "particleVirial"):
-            self.km_particleVirial = KIM_API_get_data_double(self.pkim, "particleVirial")
-        if KIM_API_get_compute(self.pkim, "hessian"):
-            self.km_hessian = KIM_API_get_data_double(self.pkim, "hessian")
-        """
+            print "neigh time = ", time.time() - neigh_start
 
-        KIM_API_model_compute(self.pkim)
+            compute_start = time.time()
+            KIM_API_model_compute(self.pkim)
+            print "compute time = ", time.time() - compute_start
+
+            # set the ase atoms stuff to current configuration
+            self.pbc = atoms.get_pbc()
+            self.cell = atoms.get_cell()
+            self.cell_orthogonal = ((abs(numpy.dot(atoms.get_cell()[0],atoms.get_cell()[1])) + abs(numpy.dot(atoms.get_cell()[0],atoms.get_cell()[2])) + abs(numpy.dot(atoms.get_cell()[1],atoms.get_cell()[2])))<10**(-8))
 
         
     def get_potential_energy(self,atoms):
@@ -140,6 +207,12 @@ class KIM_Calculator:
         else:
             raise SupportError("hessian") 
 
+    def __del__(self):
+        """ 
+        Garbage collects the KIM API objects automatically
+        """
+        pass
+        #KIM_API_free(self.pkim)
 
 class SupportError(Exception):
 
@@ -147,3 +220,10 @@ class SupportError(Exception):
         self.value = value
     def __str__(self):
         return repr(self.value)+" computation not supported by model"
+
+class InitializationError(Exception):
+            
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)+" initialization failed"

@@ -7,7 +7,6 @@ from numpy.distutils.core import setup, Extension
 import os
 
 #debug, sorry woosong
-#kim_dir = '/home/m-bierbaum/KIM/openkim-api-v1.0.0/' 
 kim_dir = os.environ['KIM_DIR']
 kim_api_dir = kim_dir + 'KIM_API/'
 
@@ -20,7 +19,7 @@ kimservice_module = Extension('_kimservice',
     )
 
 neighborlist_module = Extension('_neighborlist',
-    sources=['neighborlist.i','neighborlist.c'],
+    sources=['neighborlist.i','neighborlist.c','cvec.c'],
     include_dirs=[kim_api_dir, '.'],
     library_dirs=[kim_api_dir],
     libraries=['kim']

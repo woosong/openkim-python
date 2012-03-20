@@ -112,7 +112,7 @@ def create_FCC_configuration(FCCspacing, nCellsPerSide, periodic, coords):
     return MiddleAtomId
 
 def set_NeighborList(pkim, coords, numberOfAtoms, cutoff):
-    cutoff2 = cutoff*2
+    cutoff2 = cutoff**2
     neighbors = []
     fneighbors = []
     for i in range(numberOfAtoms):
@@ -178,7 +178,7 @@ try:
     if KIM_STATUS_OK > status:
         raise kimservice.error("KIM_API_model_init")
     import neighborlist
-    status = neighborlist.initialize(pkim) #set_kim_periodic_full_neigh(pkim)    
+    status = neighborlist.initialize(pkim) 
     KIM_API_print(pkim)
 
     atypecode = KIM_API_get_partcl_type_code(pkim, "Ar")
@@ -187,9 +187,8 @@ try:
     
     MiddleAtomId = create_FCC_configuration(FCCSPACING, NCELLSPERSIDE, 0, coordinates)
    
-    #NNeighbors, HalfNNeighbors, neighborList, RijList = set_NeighborList(pkim, coordinates, numberOfAtoms[0], cutoff[0]*2)
-    #neighborlist.set_neigh_object(pkim, NNeighbors, HalfNNeighbors, neighborList, RijList)
-    neighborlist.build_neighborlist_allall(pkim)
+    NNeighbors, HalfNNeighbors, neighborList, RijList = set_NeighborList(pkim, coordinates, numberOfAtoms[0], cutoff[0]*2)
+    neighborlist.set_neigh_object(pkim, NNeighbors, HalfNNeighbors, neighborList, RijList)
 
     KIM_API_model_compute(pkim)
 
@@ -213,5 +212,4 @@ try:
     KIM_API_free(pkim)
 except error:
     KIM_API_report_error(error.message,errno)
-
 
