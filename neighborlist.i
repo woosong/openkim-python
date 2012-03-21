@@ -1,4 +1,4 @@
-%module neighborlist
+%module kimneighborlist
 %{
 #define SWIG_FILE_WITH_INIT
 %}

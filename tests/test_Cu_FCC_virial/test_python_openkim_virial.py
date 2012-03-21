@@ -1,7 +1,7 @@
 import numpy
 import numpy.linalg as la
 from kimservice import *
-import neighborlist
+import kimneighborlist
 import virial
 
 # Copper
@@ -81,8 +81,8 @@ try:
 
     if KIM_STATUS_OK > status:
         raise kimservice.error("KIM_API_model_init")
-    status = neighborlist.set_kim_periodic_full_neigh(pkim)
-    status = neighborlist.set_kim_periodic_half_neigh(pkim)
+    status = kimneighborlist.set_kim_periodic_full_neigh(pkim)
+    status = kimneighborlist.set_kim_periodic_half_neigh(pkim)
 
     status = virial.virial_init(pkim)
     status = virial.set_virial(pkim)
@@ -98,7 +98,7 @@ try:
     KIM_API_print(pkim)
 
     NNeighbors, HalfNNeighbors, neighborList, RijList = set_NeighborList(pkim, coordinates, numberOfAtoms[0], cutoff[0]*4)
-    neighborlist.set_neigh_object(pkim, NNeighbors, HalfNNeighbors, neighborList, RijList)
+    kimneighborlist.set_neigh_object(pkim, NNeighbors, HalfNNeighbors, neighborList, RijList)
 
     KIM_API_model_compute(pkim)
 except error:

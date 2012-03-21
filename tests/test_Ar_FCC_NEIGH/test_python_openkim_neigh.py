@@ -177,8 +177,8 @@ try:
     status = KIM_API_model_init(pkim)
     if KIM_STATUS_OK > status:
         raise kimservice.error("KIM_API_model_init")
-    import neighborlist
-    status = neighborlist.initialize(pkim) 
+    import kimneighborlist
+    status = kimneighborlist.initialize(pkim) 
     KIM_API_print(pkim)
 
     atypecode = KIM_API_get_partcl_type_code(pkim, "Ar")
@@ -188,7 +188,7 @@ try:
     MiddleAtomId = create_FCC_configuration(FCCSPACING, NCELLSPERSIDE, 0, coordinates)
    
     NNeighbors, HalfNNeighbors, neighborList, RijList = set_NeighborList(pkim, coordinates, numberOfAtoms[0], cutoff[0]*2)
-    neighborlist.set_neigh_object(pkim, NNeighbors, HalfNNeighbors, neighborList, RijList)
+    kimneighborlist.set_neigh_object(pkim, NNeighbors, HalfNNeighbors, neighborList, RijList)
 
     KIM_API_model_compute(pkim)
 
@@ -207,7 +207,7 @@ print ""
 print "Energy = %20.15e" %  energy[0]
 
 try:
-    neighborlist.free_neigh_object(pkim)
+    kimneighborlist.free_neigh_object(pkim)
     KIM_API_model_destroy(pkim)
     KIM_API_free(pkim)
 except error:

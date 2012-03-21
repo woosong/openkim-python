@@ -17,7 +17,7 @@ kimservice_module = Extension('_kimservice',
     libraries=['kim']
     )
 
-neighborlist_module = Extension('_neighborlist',
+kimneighborlist_module = Extension('_kimneighborlist',
     sources=['neighborlist.i','neighborlist.c','cvec.c'],
     include_dirs=[kim_api_dir, '.'],
     library_dirs=[kim_api_dir],
@@ -26,9 +26,9 @@ neighborlist_module = Extension('_neighborlist',
 
 setup (name = 'kimservice',
     version = '0.0.1a',
-    author      = "woosong",
+    author      = "Woosong Choi, Matt Bierbaum, Yanjiun Chen",
     description = """KIM python interface""",
-    ext_modules = [kimservice_module, neighborlist_module],
+    ext_modules = [kimservice_module, kimneighborlist_module],
     py_modules = ['kimdescriptor'],
     data_files=[('kim_virial_template', ['virial/virial.c', 'virial/virial.h', 'virial/virial.i','virial/setup.py'])],
     )
