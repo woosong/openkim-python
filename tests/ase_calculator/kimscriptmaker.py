@@ -45,7 +45,7 @@ def makekimscript(modelname,testname,atoms):
     for code, symbol in zip(list(acodes),list(asymbols)):
         kimstr += symbol +" spec "+str(code) + "\n"   
 
-    print "put atoms and symbols in string"
+    #print "put atoms and symbols in string"
 
     # CONVENTIONS
     kimstr += "CONVENTIONS:\n"

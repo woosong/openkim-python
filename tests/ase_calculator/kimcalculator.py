@@ -23,7 +23,7 @@ import time
 
 class KIM_Calculator:
 
-    def __init__(self,modelname, cellLocator=True):
+    def __init__(self,modelname,ucell=True):
         # correctly set up the .kim file so that is matches that
         # of modelname, i.e. will run any types
         self.testname = "test_"+modelname
@@ -36,7 +36,7 @@ class KIM_Calculator:
             raise InitializationError(self.modelname)
         km_pmdl = 0
 
-        self.cellLocator = cellLocator
+        self.ucell = ucell
 
         # initialize pointers for kim
         self.km_numberOfAtoms  = None
@@ -143,19 +143,18 @@ class KIM_Calculator:
                 self.km_atomTypes[i] = KIM_API_get_partcl_type_code(self.pkim, symbols[i])
             
             # build the neighborlist (not a cell-based, type depends on model)
-            print KIM_API_get_NBC_method(self.pkim)
-            neigh_start = time.time()
+            #print KIM_API_get_NBC_method(self.pkim)
             kimnl.set_cell(atoms.get_cell().flatten(), atoms.get_pbc().flatten().astype('int8'))
-            if self.cellLocator == True:
-                kimnl.build_neighborlist(self.pkim)
+            neigh_start = time.time()
+            if self.ucell == True:
+                kimnl.build_neighborlist_cell(self.pkim)
             else:
                 kimnl.build_neighborlist_allall(self.pkim)
+            #print "neigh time = ", time.time() - neigh_start
 
-            print "neigh time = ", time.time() - neigh_start
-
-            compute_start = time.time()
+            calc_start = time.time()
             KIM_API_model_compute(self.pkim)
-            print "compute time = ", time.time() - compute_start
+            #print "calc time = ", time.time() - calc_start 
 
             # set the ase atoms stuff to current configuration
             self.pbc = atoms.get_pbc()

@@ -23,8 +23,8 @@ typedef struct
 */
 int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
               int* numnei, int** nei1atom, double** Rij);
-int build_neighborlist_allall(void *kimmdl);
-int build_neighborlist_cell(void *kimmdl);
+//int build_neighborlist_allall(void *kimmdl);
+//int build_neighborlist_cell(void *kimmdl);
 
 
 int initialize(void* kimmdl) {
@@ -232,6 +232,10 @@ inline double det(double a11, double a12, double a21, double a22){
     return (a11*a22) - (a12*a21);
 }
 
+inline double dot3(double *a, double *b){
+    return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+} 
+
 inline double det3(double *mat){
     double dd = (mat[0]*mat[4]*mat[8] - mat[0]*mat[5]*mat[7] -
                  mat[1]*mat[3]*mat[8] + mat[1]*mat[5]*mat[6] +
@@ -279,6 +283,15 @@ void is_orthogonal(double *mat, int *ortho){
     }
 }
 
+void printmat(double *m){
+    int i,j;
+    for (i=0; i<3; i++){
+        for (j=0; j<3; j++){
+            printf(" %f ", m[3*i+j]);
+        }
+        printf("\n");
+    }
+}
 
 int set_cell(int S1, double* Cell, int S2, int* PBC){
     if (S1 != 9) printf("WARNING: cell size greater than 9.  Taking first 9 elements\n");
@@ -291,21 +304,17 @@ int set_cell(int S1, double* Cell, int S2, int* PBC){
     periodic = (pbc[0]+pbc[1]+pbc[2] > 0);
     transpose(cellf);    
     inverse(cellf, cellr);        
-
+    
     init = 1;
     return 0;
 }
 
 
 void transform(double coords[3], double cell[9], double out[3]){
-    int i,j;
-    for (i=0; i<3; i++){
-        out[i] = 0.0;
-        for (j=0; j<3; j++)
-            out[i] += coords[j]*cell[3*i + j];
-    }
+   int i;
+    for (i=0; i<3; i++)
+        out[i] = dot3(&cell[3*i], coords);
 }
-
 
 /* =====================================================
    call this, and it will decide which to use
@@ -529,31 +538,49 @@ int build_neighborlist_cell(void *kimmdl)
     int neighbors;
     double dx[3];
     double ds[3];
-    double rcut_vec[3];
-    double rcut_vect[3];
-    double r2, rcut, rcut2;
+    double R, R2, dist;
 
-    int box = ortho[0]*ortho[1]*ortho[2]; 
-    rcut  = *cutoff;
-    rcut2 = (*cutoff)*(*cutoff);
-
-    for (i=0; i<3; i++)
-        rcut_vec[i] = rcut;
-    transform(rcut_vec, cellr, rcut_vect);
+    int box = ortho[0]*ortho[1]*ortho[2];
+    R  = *cutoff;
+    R2 = (*cutoff)*(*cutoff);
 
     ncoords = (double*)malloc(sizeof(double)*(*numberOfParticles)*3);
     for (i=0; i<*numberOfParticles; i++)
         transform(&coords[i*3], cellr, &ncoords[i*3]);
 
+    /* all of this to make the perfect box size for the cells */
+    // create unit vectors along the cell, column vectors
+    double span[9];
+    for (i=0; i<3; i++){
+        double len = 0.0;
+        for (j=0; j<3; j++)
+            len += cellf[3*j+i]*cellf[3*j+i];
+        for (j=0; j<3; j++) 
+            span[3*j+i] = cellf[3*j+i]/sqrt(len);
+    }
+
+    double factor[3];
+    for (i=0; i<3; i++){
+        double tcos, tsin;
+        double sinmin = 1.0;
+        for (j=0; j<3; j++){
+            if (i != j){
+                tcos = span[3*0+i]*span[3*0+j] + span[3*1+i]*span[3*1+j] + span[3*2+i]*span[3*2+j];
+                tsin = sqrt(1 - tcos*tcos);
+                if (tsin < sinmin) sinmin = tsin;
+            }
+        }
+        factor[i] = sinmin;
+    }
+    
     /* make the cell box */
     int size[3];
     int size_total = 1;
-
+    
     for (i=0; i<3; i++){
-        //double rtemp = sqrt(cellf[3*i+0]*cellf[3*i+0] + cellf[3*i+1]*cellf[3*i+1] + cellf[3*i+2]*cellf[3*i+2]);
         double rtemp = sqrt(cellf[3*0+i]*cellf[3*0+i] + cellf[3*1+i]*cellf[3*1+i] + cellf[3*2+i]*cellf[3*2+i]);
-        if (box == 0) rtemp /= sqrt(3.0);
-        size[i] = (int)(rtemp / rcut) + 1;
+        if (box == 0) rtemp *= factor[i]/sqrt(3.0);
+        size[i] = (int)(rtemp / R) + 1;
         size_total *= size[i];
     }
     
@@ -591,7 +618,7 @@ int build_neighborlist_cell(void *kimmdl)
             for (j=0; j<cell->elems; j++){
                 int n = cvec_at(cell, j); 
                 if ((i != n) && ((ishalf==0) || ((ishalf!=0) && (n > i)))){
-                    r2 = 0.0;
+                    dist = 0.0;
                     for (k=0; k<3; k++){
                         dx[k] = ncoords[3*n+k] - ncoords[3*i+k];
                     
@@ -603,9 +630,9 @@ int build_neighborlist_cell(void *kimmdl)
                
                     transform(dx, cellf, ds);
                     for (k=0; k<3; k++) 
-                        r2 += ds[k]*ds[k];
+                        dist += ds[k]*ds[k];
 
-                    if (r2 < rcut2){ //4 for a buffer
+                    if (dist < R2){ //4 for a buffer
                         // atom j is a neighbor of atom i
                         cvec_insert_back(temp_neigh, n);
                         if (rijlist){
