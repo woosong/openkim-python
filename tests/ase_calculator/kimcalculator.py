@@ -146,10 +146,7 @@ class KIM_Calculator:
             #print KIM_API_get_NBC_method(self.pkim)
             kimnl.set_cell(atoms.get_cell().flatten(), atoms.get_pbc().flatten().astype('int8'))
             neigh_start = time.time()
-            if self.ucell == True:
-                kimnl.build_neighborlist_cell(self.pkim)
-            else:
-                kimnl.build_neighborlist_allall(self.pkim)
+            kimnl.build_neighborlist(self.pkim)
             #print "neigh time = ", time.time() - neigh_start
 
             calc_start = time.time()

@@ -320,14 +320,14 @@ void transform(double coords[3], double cell[9], double out[3]){
    call this, and it will decide which to use
    ====================================================*/
 int build_neighborlist(void *kimmdl){
+    /* if the user didn't specify the box, don't die, just
+       use the all neighbor list */
     if (init == 0){
         pbc[0] = pbc[1] = pbc[2] = 0;
         return build_neighborlist_allall(kimmdl);
     }
 
-    /* if it is too skew, just go ahead and use the allall */
-    if (fabs(cellf[1]) > fabs(cellf[4]) || cellf[2]*cellf[2] + cellf[5]*cellf[5] > cellf[8]*cellf[8])
-        return build_neighborlist_allall(kimmdl);
+    /* otherwise, the cell works for all types */
     return build_neighborlist_cell(kimmdl);
 }
 
