@@ -23,11 +23,8 @@ typedef struct
 */
 int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
               int* numnei, int** nei1atom, double** Rij);
-//int build_neighborlist_allall(void *kimmdl);
-//int build_neighborlist_cell(void *kimmdl);
 
-
-int initialize(void* kimmdl) {
+int initialize(void *kimmdl){
     int status;
 
     // setup a blank neighborlist
@@ -368,6 +365,12 @@ int build_neighborlist_allall(void *kimmdl)
             "boxSideLengths",       &boxSideLengths,        mi_opbc);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__, "KIM_API_getm_data", status);
 
+    if (mi_opbc){
+        boxSideLengths[0] = cellf[0];
+        boxSideLengths[1] = cellf[4];  
+        boxSideLengths[2] = cellf[8];
+    }
+
     nl = (NeighList*) KIM_API_get_data(kimmdl, "neighObject", &status);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
 
@@ -521,8 +524,14 @@ int build_neighborlist_cell(void *kimmdl)
             "numberOfParticles",    &numberOfParticles,     1,
             "coordinates",          &coords,                1,
             "cutoff",               &cutoff,                1,
-            "boxSideLengths",       &boxSideLengths,        periodic);
+            "boxSideLengths",       &boxSideLengths,        mi_opbc);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__, "KIM_API_getm_data", status);
+
+    if (mi_opbc){
+        boxSideLengths[0] = cellf[0];
+        boxSideLengths[1] = cellf[4];  
+        boxSideLengths[2] = cellf[8];
+    }
 
     nl = (NeighList*) KIM_API_get_data(kimmdl, "neighObject", &status);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
