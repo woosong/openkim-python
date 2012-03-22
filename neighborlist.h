@@ -14,6 +14,6 @@ int set_neigh_object(void* kimmdl, int sz1, int* NNeighbors,
                                    int sz2, int* HalfNNeighbors, 
                                    int sz3, int* neighborList, 
                                    int sz4, double* RijList); 
-int free_neigh_object(void* kimmdl); 
+int cleanup(void* kimmdl); 
 
 #endif

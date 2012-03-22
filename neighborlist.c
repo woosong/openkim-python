@@ -10,6 +10,7 @@
 /* Define neighborlist structure */
 typedef struct
 {
+   int ready;
    int iteratorId;
    int* NNeighbors;
    int* HalfNNeighbors;
@@ -27,6 +28,8 @@ int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
 int initialize(void *kimmdl){
     int status;
 
+    free_neigh_object(kimmdl);               
+
     // setup a blank neighborlist
     NeighList *nl = (NeighList*)malloc(sizeof(NeighList));
     nl->NNeighbors     = (int*)malloc(sizeof(int)*1);
@@ -34,6 +37,7 @@ int initialize(void *kimmdl){
     nl->neighborList   = (int*)malloc(sizeof(int)*1);
     nl->RijList        = (double*)malloc(sizeof(double)*1);
     nl->iteratorId     = -1;
+    nl->ready          = 0;
 
     status = KIM_API_set_data(kimmdl, "neighObject", 1, nl);
     status = KIM_API_set_data(kimmdl, "get_neigh", 1, (void*)&get_neigh);
@@ -57,12 +61,17 @@ int free_neigh_object(void* pkim) {
     if (nl==NULL)
         return KIM_STATUS_OK;
 
+    nl->ready = 0;
     safefree(nl->NNeighbors);
     safefree(nl->HalfNNeighbors);
     safefree(nl->neighborList);
     safefree(nl->RijList);
 
     return status;
+}
+
+int cleanup(void *pkim){
+    free_neigh_object(pkim);
 }
 
 /*
@@ -78,11 +87,16 @@ int set_neigh_object(void* kimmdl, int sz1, int* NNeighbors,
     //int set_neigh_object(void* kimmdl, int* NNeighbors, int* neighborList, double* RijList) {
     NeighList *nl;
     int status;
+
     nl = (NeighList*) KIM_API_get_data(kimmdl, "neighObject", &status);
     if (KIM_STATUS_OK == status) {
         free_neigh_object(kimmdl);
     };
 
+    if (nl == NULL)
+        initialize(kimmdl);
+
+    nl->ready          = 1; 
     nl->iteratorId     = -1;
     nl->NNeighbors     = (int*)malloc(sizeof(int)*sz1);
     nl->HalfNNeighbors = (int*)malloc(sizeof(int)*sz2);
@@ -93,7 +107,7 @@ int set_neigh_object(void* kimmdl, int sz1, int* NNeighbors,
     memcpy(nl->HalfNNeighbors, HalfNNeighbors, sizeof(int)*sz2);
     memcpy(nl->neighborList, neighborList, sizeof(int)*sz3);
     memcpy(nl->RijList, RijList, sizeof(double)*sz4);
-    
+   
     return status;
 }
 
@@ -105,6 +119,7 @@ static int ndim = 3;
 int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
               int* numnei, int** nei1atom, double** Rij)
 {
+
    /* local variables */
    intptr_t* pkim = *((intptr_t**) kimmdl);
    int atomToReturn;
@@ -126,6 +141,12 @@ int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
 
    nl = (NeighList*) KIM_API_get_data(pkim, "neighObject", &status);
    if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
+
+   /* if the user got here by mistake, correct it */
+   if (nl == NULL)
+        initialize(kimmdl);
+   if (!nl->ready)
+        build_neighborlist_cell(kimmdl);
 
    /* figure out the neighbor locator type */
    method = KIM_API_get_NBC_method(pkim, &status);
@@ -374,6 +395,10 @@ int build_neighborlist_allall(void *kimmdl)
     nl = (NeighList*) KIM_API_get_data(kimmdl, "neighObject", &status);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
 
+    /* if the user got here by mistake, correct it */
+    if (nl == NULL)
+        initialize(kimmdl);
+ 
     /* reset the NeighList object to refill */
     free_neigh_object(kimmdl);
     
@@ -451,6 +476,7 @@ int build_neighborlist_allall(void *kimmdl)
     safefree(temp_rij);
     safefree(ncoords);
     
+    nl->ready = 1;
     return status;
 }
 
@@ -535,7 +561,10 @@ int build_neighborlist_cell(void *kimmdl)
 
     nl = (NeighList*) KIM_API_get_data(kimmdl, "neighObject", &status);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
-
+    /* if the user got here by mistake, correct it */
+    if (nl == NULL)
+        initialize(kimmdl);
+ 
     /* reset the NeighList object to refill */
     free_neigh_object(kimmdl);
     nl->iteratorId     = -1;
@@ -682,6 +711,7 @@ int build_neighborlist_cell(void *kimmdl)
     safefree(ncoords);
     safefree(hash);
 
+    nl->ready = 1; 
     return status;
 }
 
