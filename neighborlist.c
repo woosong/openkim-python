@@ -340,11 +340,13 @@ void transform(double coords[3], double cell[9], double out[3]){
    call this, and it will decide which to use
    ====================================================*/
 int build_neighborlist(void *kimmdl){
+    int rvec;
     int status;
     char *method;
 
     method = KIM_API_get_NBC_method(kimmdl, &status);
-    if (KIM_STATUS_OK > status) 
+    rvec = strcmp(method,"NEIGH_RVEC_F");
+    if (KIM_STATUS_OK > status)
         KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
     safefree(method);
 
@@ -355,13 +357,11 @@ int build_neighborlist(void *kimmdl){
         return build_neighborlist_allall(kimmdl);
 
     /* otherwise, the cell works for all types */
-    if (!strcmp(method, "NEIGH_RVEC_F"))
+    if (!rvec)
         return build_neighborlist_cell_rvec(kimmdl);
     return build_neighborlist_cell(kimmdl);
 }
 
-
-int NN=-1;
 
 /*======================================================
   the simple all-all neighbor list
@@ -632,12 +632,12 @@ int build_neighborlist_cell_rvec(void *kimmdl)
 
     double dx[3];
     double ds[3];
- 
+
     for (i=0; i<*numberOfParticles; i++){
         neighbors = 0;
         /* translate back to a cell id */
         coords_to_index(&ncoords[3*i], size, index);
-
+        
         /* loop over the neighboring cells */
         for (tt[0]=-1; tt[0]<=1; tt[0]++){
         for (tt[1]=-1; tt[1]<=1; tt[1]++){
@@ -665,7 +665,7 @@ int build_neighborlist_cell_rvec(void *kimmdl)
                         if (image[k])
                             dx[k] += tt[k];
                     }
-                
+       
                     /* take back to the curvy cell */
                     transform(dx, cellf, ds);
                     for (k=0; k<3; k++) 
