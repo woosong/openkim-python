@@ -22,8 +22,13 @@ typedef struct
    The c method to return the neighbor pointer, regardless of if it 
    came from python or the c libraries
 */
+int build_neighborlist_cell(void *kimmdl);
+int build_neighborlist_cell_rvec(void *kimmdl);
+int build_neighborlist_allall(void *kimmdl);
+
 int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
               int* numnei, int** nei1atom, double** Rij);
+
 
 int initialize(void *kimmdl){
     int status;
@@ -236,14 +241,12 @@ int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
 
 /*===========================================================================
     A standard library of neighbor locators for use with 
-    the python KIM API.  All of these were implemented in the
-    ex_test_Ar_* files in the v1.0.0 API source
+    the python KIM API.  
   ==========================================================================*/
 double cellf[9] = {1.0, 0.0, 0.0, /*|*/ 0.0, 1.0, 0.0, /*|*/ 0.0, 0.0, 1.0};
 double cellr[9] = {1.0, 0.0, 0.0, /*|*/ 0.0, 1.0, 0.0, /*|*/ 0.0, 0.0, 1.0};
-int    pbc[3]   = {1, 1, 1};
+int    pbc[3]   = {0, 0, 0};
 int    ortho[3] = {1, 1, 1};
-int    periodic = 1;
 int    init     = 0;
 
 inline double det(double a11, double a12, double a21, double a22){
@@ -319,7 +322,6 @@ int set_cell(int S1, double* Cell, int S2, int* PBC){
     memcpy(cellf, Cell, sizeof(double)*9);
 
     is_orthogonal(cellf, ortho);
-    periodic = (pbc[0]+pbc[1]+pbc[2] > 0);
     transpose(cellf);    
     inverse(cellf, cellr);        
     
@@ -338,21 +340,32 @@ void transform(double coords[3], double cell[9], double out[3]){
    call this, and it will decide which to use
    ====================================================*/
 int build_neighborlist(void *kimmdl){
+    int status;
+    char *method;
+
+    method = KIM_API_get_NBC_method(kimmdl, &status);
+    if (KIM_STATUS_OK > status) 
+        KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
+    safefree(method);
+
     /* if the user didn't specify the box, don't die, just
-       use the all neighbor list */
-    if (init == 0){
-        pbc[0] = pbc[1] = pbc[2] = 0;
+       use the all neighbor list, can't assume 
+       anything about periodic conditions or cell */
+    if (init == 0)
         return build_neighborlist_allall(kimmdl);
-    }
 
     /* otherwise, the cell works for all types */
+    if (!strcmp(method, "NEIGH_RVEC_F"))
+        return build_neighborlist_cell_rvec(kimmdl);
     return build_neighborlist_cell(kimmdl);
 }
 
 
+int NN=-1;
 
 /*======================================================
   the simple all-all neighbor list
+  works for all neighborlists but rvec
   ======================================================*/
 int build_neighborlist_allall(void *kimmdl)
 {
@@ -483,6 +496,8 @@ int build_neighborlist_allall(void *kimmdl)
 
 //========================================================================
 // the more advanced cell neighbor locator
+// this version works for rvec only - it would be inefficient 
+// to combine this with the other
 //========================================================================
 inline void coords_to_index(double *x, int *size, int *index){   
     int i;
@@ -490,6 +505,217 @@ inline void coords_to_index(double *x, int *size, int *index){
         index[i] = (int)(x[i] * size[i]);
 }
 
+inline int mod_rvec(int a, int b, int p, int *image){
+    *image = 1;
+    if (b==0) {if (a==0) *image=0; return 0;}
+    if (p != 0){
+        if (a>b)  return a-b-1;
+        if (a<0)  return a+b+1;
+    } else {
+        if (a>b)  return b;
+        if (a<0)  return 0;
+    }
+    *image = 0;
+    return a;
+}
+
+
+int build_neighborlist_cell_rvec(void *kimmdl)
+{
+    int i, j, k, l;
+    int status;
+    int* numberOfParticles;
+    double* coords;
+    double* ncoords; 
+    double* cutoff;
+    char *method;
+    NeighList *nl;
+ 
+    /* get the data necessary for the neighborlist */
+    KIM_API_getm_data(kimmdl, &status, 3*3,
+            "numberOfParticles",    &numberOfParticles,     1,
+            "coordinates",          &coords,                1,
+            "cutoff",               &cutoff,                1);
+    if (KIM_STATUS_OK > status) 
+        KIM_API_report_error(__LINE__, __FILE__, "KIM_API_getm_data", status);
+
+    nl = (NeighList*) KIM_API_get_data(kimmdl, "neighObject", &status);
+    if (KIM_STATUS_OK > status) 
+        KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
+
+    /* if the user got here by mistake, correct it */
+    if (nl == NULL)  initialize(kimmdl);
+ 
+    /* reset the NeighList object to refill */
+    free_neigh_object(kimmdl);
+    nl->iteratorId     = -1;
+    nl->NNeighbors     = (int*)malloc(sizeof(int)*(*numberOfParticles));
+    nl->HalfNNeighbors = (int*)malloc(sizeof(int)*(*numberOfParticles));
+
+    /* begin the actual neighborlist calculation */
+    double R, R2, dist;
+
+    int box = ortho[0]*ortho[1]*ortho[2];
+    R  = *cutoff;
+    R2 = (*cutoff)*(*cutoff);
+
+    ncoords = (double*)malloc(sizeof(double)*(*numberOfParticles)*3);
+    for (i=0; i<*numberOfParticles; i++)
+        transform(&coords[i*3], cellr, &ncoords[i*3]);
+
+    /* all of this to make the perfect box size for the cells */
+    // create unit vectors along the cell, column vectors
+    double span[9];
+    for (i=0; i<3; i++){
+        double len = 0.0;
+        for (j=0; j<3; j++)
+            len += cellf[3*j+i]*cellf[3*j+i];
+        for (j=0; j<3; j++) 
+            span[3*j+i] = cellf[3*j+i]/sqrt(len);
+    }
+
+    double factor[3];
+    for (i=0; i<3; i++){
+        double tcos, tsin;
+        double sinmin = 1.0;
+        for (j=0; j<3; j++){
+            if (i != j){
+                tcos = span[3*0+i]*span[3*0+j] 
+                     + span[3*1+i]*span[3*1+j] 
+                     + span[3*2+i]*span[3*2+j];
+                tsin = sqrt(1 - tcos*tcos);
+                if (tsin < sinmin) sinmin = tsin;
+            }
+        }
+        factor[i] = sinmin;
+    }
+    
+    /* make the cell box */
+    int size[3];
+    int size_total = 1;
+    
+    for (i=0; i<3; i++){
+        double rtemp = sqrt(cellf[3*0+i]*cellf[3*0+i] 
+                          + cellf[3*1+i]*cellf[3*1+i] 
+                          + cellf[3*2+i]*cellf[3*2+i]);
+        if (box == 0) rtemp *= factor[i]/sqrt(3.0);
+        size[i] = (int)(rtemp / R) + 1;
+        size_total *= size[i];
+    }
+    
+    cvec **cells = (cvec**)malloc(sizeof(cvec*)*size_total);
+    int *hash    =   (int*)malloc(sizeof(int)*size_total);
+    for (i=0; i<size_total; i++){
+        cells[i] = (cvec*)malloc(sizeof(cvec));
+        hash[i]  = 0;
+        cvec_init(cells[i], 4);
+    }
+
+    int index[3];
+    for (i=0; i<*numberOfParticles; i++){
+        coords_to_index(&ncoords[3*i], size, index);
+        cvec_insert_back(cells[index[0] + index[1]*size[0] 
+                                        + index[2]*size[0]*size[1]], i);
+    }
+
+    cvec *temp_neigh = (cvec*)malloc(sizeof(cvec));
+    dvec *temp_rij   = (dvec*)malloc(sizeof(dvec));
+    cvec_init(temp_neigh, 4);
+    dvec_init(temp_rij,   4);
+   
+    int total = 0;
+    int neighbors;
+
+    int tt[3];
+    int tix[3];
+    int image[3];
+
+    double dx[3];
+    double ds[3];
+ 
+    for (i=0; i<*numberOfParticles; i++){
+        neighbors = 0;
+        /* translate back to a cell id */
+        coords_to_index(&ncoords[3*i], size, index);
+
+        /* loop over the neighboring cells */
+        for (tt[0]=-1; tt[0]<=1; tt[0]++){
+        for (tt[1]=-1; tt[1]<=1; tt[1]++){
+        for (tt[2]=-1; tt[2]<=1; tt[2]++){
+            int goodcell = 1;    
+            for (j=0; j<3; j++){
+                tix[j] = mod_rvec(index[j]+tt[j],size[j]-1,pbc[j],&image[j]);
+                if (pbc[j] < image[j])
+                    goodcell=0;
+            }
+        
+            if (goodcell){
+                int ind = tix[0] + tix[1]*size[0] + tix[2]*size[0]*size[1];
+                cvec *cell = cells[ind];
+
+                /* for every particle in that cell */
+                for (j=0; j<cell->elems; j++){
+                    int n = cvec_at(cell, j); 
+
+                    /* find the distance vecs in our 1x1x1 box */
+                    dist = 0.0;
+                    for (k=0; k<3; k++){
+                        dx[k] = ncoords[3*n+k] - ncoords[3*i+k];
+                
+                        if (image[k])
+                            dx[k] += tt[k];
+                    }
+                
+                    /* take back to the curvy cell */
+                    transform(dx, cellf, ds);
+                    for (k=0; k<3; k++) 
+                        dist += ds[k]*ds[k];
+
+                    /* do we have a neighbor */
+                    if (dist > 1e-10 && dist < R2){ 
+                        cvec_insert_back(temp_neigh, n);
+                        for (k=0; k<3; k++)
+                            dvec_insert_back(temp_rij, ds[k]);
+                        neighbors++;
+                    }
+                }
+            }
+        } } }
+        /* update that particles list */
+        nl->HalfNNeighbors[i] = neighbors;
+        nl->NNeighbors[i] = neighbors;
+        
+        total += neighbors;
+    }
+
+    nl->neighborList = (int*)malloc(sizeof(int)*total);
+    nl->RijList      = (double*)malloc(sizeof(double)*total*3);
+
+    memcpy(nl->neighborList, temp_neigh->array, sizeof(int)*total);
+    memcpy(nl->RijList, temp_rij->array, sizeof(double)*total*3);
+
+    /* cleanup all the memory usage */
+    cvec_destroy(temp_neigh);
+    dvec_destroy(temp_rij);
+    for (i=0; i<size_total; i++){
+        cvec_destroy(cells[i]); 
+        safefree(cells[i]);
+    }
+    safefree(cells);
+    safefree(temp_neigh);
+    safefree(temp_rij);
+    safefree(ncoords);
+    safefree(hash);
+
+    nl->ready = 1; 
+    return status;
+}
+
+
+//========================================================================
+// the less advanced cell neighbor locator
+// works for everything that is not rvec
+//========================================================================
 inline int mod(int a, int b, int p){
     if (p != 0){
         if (b==0) return 0;

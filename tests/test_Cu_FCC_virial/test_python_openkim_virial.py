@@ -81,8 +81,9 @@ try:
 
     if KIM_STATUS_OK > status:
         raise kimservice.error("KIM_API_model_init")
-    status = kimneighborlist.set_kim_periodic_full_neigh(pkim)
-    status = kimneighborlist.set_kim_periodic_half_neigh(pkim)
+#    status = kimneighborlist.set_kim_periodic_full_neigh(pkim)
+#    status = kimneighborlist.set_kim_periodic_half_neigh(pkim)
+    kimneighborlist.initialize(pkim)
 
     status = virial.virial_init(pkim)
     status = virial.set_virial(pkim)
@@ -97,8 +98,9 @@ try:
 
     KIM_API_print(pkim)
 
-    NNeighbors, HalfNNeighbors, neighborList, RijList = set_NeighborList(pkim, coordinates, numberOfAtoms[0], cutoff[0]*4)
-    kimneighborlist.set_neigh_object(pkim, NNeighbors, HalfNNeighbors, neighborList, RijList)
+#    NNeighbors, HalfNNeighbors, neighborList, RijList = set_NeighborList(pkim, coordinates, numberOfAtoms[0], cutoff[0]*4)
+#    kimneighborlist.set_neigh_object(pkim, NNeighbors, HalfNNeighbors, neighborList, RijList)
+    kimneighborlist.build_neighborlist(pkim)
 
     KIM_API_model_compute(pkim)
 except error:

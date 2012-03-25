@@ -43,8 +43,8 @@
 %}
 
 %{
-static PyObject *kimerror;
-static PyIntObject *kimerrno;
+static PyObject *kimerror = NULL;
+static PyIntObject *kimerrno = NULL;
 %}
 %pythoncode %{
 error=_kimservice.error
@@ -53,7 +53,8 @@ errno=_kimservice.errno
 
 /* all functions that return an error are treated as exceptions */
 %typemap(argout) int *error {
-    kimerrno->ob_ival = *$1;
+    // TODO find out why this breaks
+    //kimerrno->ob_ival = *$1;
     if (KIM_STATUS_OK > *$1) {
         PyErr_SetString(kimerror, "$symname");
         return NULL;
@@ -67,7 +68,7 @@ errno=_kimservice.errno
 %init %{
 import_array();
 
-// also init the error object
+    // also init the error object
     kimerror = PyErr_NewException("kimservice.error", NULL, NULL);
     Py_INCREF(kimerror);
     PyModule_AddObject(m, "error", kimerror);
