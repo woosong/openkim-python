@@ -25,6 +25,7 @@ typedef struct
 int build_neighborlist_cell(void *kimmdl);
 int build_neighborlist_cell_rvec(void *kimmdl);
 int build_neighborlist_allall(void *kimmdl);
+int free_neigh_object(void *kimmdl);
 
 int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
               int* numnei, int** nei1atom, double** Rij);
@@ -77,6 +78,7 @@ int free_neigh_object(void* pkim) {
 
 int cleanup(void *pkim){
     free_neigh_object(pkim);
+    return KIM_STATUS_OK;
 }
 
 /*
@@ -522,13 +524,12 @@ inline int mod_rvec(int a, int b, int p, int *image){
 
 int build_neighborlist_cell_rvec(void *kimmdl)
 {
-    int i, j, k, l;
+    int i, j, k;
     int status;
     int* numberOfParticles;
     double* coords;
     double* ncoords; 
     double* cutoff;
-    char *method;
     NeighList *nl;
  
     /* get the data necessary for the neighborlist */
@@ -553,6 +554,7 @@ int build_neighborlist_cell_rvec(void *kimmdl)
     nl->HalfNNeighbors = (int*)malloc(sizeof(int)*(*numberOfParticles));
 
     /* begin the actual neighborlist calculation */
+    int copies[3];
     double R, R2, dist;
 
     int box = ortho[0]*ortho[1]*ortho[2];
@@ -599,7 +601,14 @@ int build_neighborlist_cell_rvec(void *kimmdl)
                           + cellf[3*1+i]*cellf[3*1+i] 
                           + cellf[3*2+i]*cellf[3*2+i]);
         if (box == 0) rtemp *= factor[i]/sqrt(3.0);
-        size[i] = (int)(rtemp / R) + 1;
+        size[i] = (int)(rtemp / R);
+        copies[i] = 1;
+
+        if (size[i] == 0){
+            size[i] = 1;
+            copies[i] = (int)(R/rtemp) + 1;
+        }
+
         size_total *= size[i];
     }
     
@@ -639,9 +648,9 @@ int build_neighborlist_cell_rvec(void *kimmdl)
         coords_to_index(&ncoords[3*i], size, index);
         
         /* loop over the neighboring cells */
-        for (tt[0]=-1; tt[0]<=1; tt[0]++){
-        for (tt[1]=-1; tt[1]<=1; tt[1]++){
-        for (tt[2]=-1; tt[2]<=1; tt[2]++){
+        for (tt[0]=-copies[0]; tt[0]<=copies[0]; tt[0]++){
+        for (tt[1]=-copies[1]; tt[1]<=copies[1]; tt[1]++){
+        for (tt[2]=-copies[2]; tt[2]<=copies[2]; tt[2]++){
             int goodcell = 1;    
             for (j=0; j<3; j++){
                 tix[j] = mod_rvec(index[j]+tt[j],size[j]-1,pbc[j],&image[j]);
