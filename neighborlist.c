@@ -381,7 +381,7 @@ int build_neighborlist(void *kimmdl){
 
 /*======================================================
   the simple all-all neighbor list
-  works for all neighborlists but rvec
+  works for all neighborlists including rvec
   ======================================================*/
 int build_neighborlist_allall(void *kimmdl)
 {
@@ -393,6 +393,8 @@ int build_neighborlist_allall(void *kimmdl)
     char *method;
     double *boxSideLengths;
     NeighList *nl;
+
+    double tt[3];
  
     int ishalf   = 0;
     int rijlist  = 0;
@@ -448,8 +450,13 @@ int build_neighborlist_allall(void *kimmdl)
     rcut2 = rcut*rcut;
 
     ncoords = (double*)malloc(sizeof(double)*(*numberOfParticles)*3);
-    for (i=0; i<*numberOfParticles; i++)
+    for (i=0; i<*numberOfParticles; i++){
         transform(&coords[i*3], cellr, &ncoords[i*3]);
+        for (j=0; j<3; j++){
+            if (pbc[j] == 1)  
+                ncoords[3*i+j] = fmod1(ncoords[3*i+j]);
+        }
+    }
 
     cvec *temp_neigh = (cvec*)malloc(sizeof(cvec));
     dvec *temp_rij   = (dvec*)malloc(sizeof(dvec));
@@ -461,11 +468,15 @@ int build_neighborlist_allall(void *kimmdl)
     for (i=0; i<*numberOfParticles; i++){
         neighbors = 0;
         for (j=(i+1)*ishalf; j<*numberOfParticles; j++){
-            if (i != j){
+
+            if (rijlist){
+                for (tt[0]=-1*pbc[0]; tt[0]<=1*pbc[0]; tt[0]++){
+                for (tt[1]=-1*pbc[1]; tt[1]<=1*pbc[1]; tt[1]++){
+                for (tt[2]=-1*pbc[2]; tt[2]<=1*pbc[2]; tt[2]++){
+
                 for (k=0; k<3; k++){
                     dx[k] = ncoords[3*j+k] - ncoords[3*i+k];
-                    if (pbc[k] != 0)
-                        dx[k] = fmod1(dx[k]);
+                    dx[k] += tt[k];
                 }
                
                 transform(dx, cellf, ds); 
@@ -474,7 +485,30 @@ int build_neighborlist_allall(void *kimmdl)
                 for (k=0; k<3; k++)    
                     r2 += ds[k]*ds[k];
                 
-                if (r2 < rcut2){ //4 for a buffer
+                if (r2 > 1e-10 && r2 < rcut2){ //4 for a buffer
+                    cvec_insert_back(temp_neigh, j); 
+                    if (rijlist){
+                        for (k=0; k<3; k++)
+                            dvec_insert_back(temp_rij, ds[k]); 
+                    }
+                    neighbors++;
+                }
+                } } }
+            }
+            else {
+                for (k=0; k<3; k++){
+                    dx[k] = ncoords[3*j+k] - ncoords[3*i+k];
+                    if (pbc[k] != 0)
+                        dx[k] += fmod1(dx[k]); 
+                }
+               
+                transform(dx, cellf, ds); 
+
+                r2 = 0.0;
+                for (k=0; k<3; k++)    
+                    r2 += ds[k]*ds[k];
+                
+                if (r2 > 1e-10 && r2 < rcut2){ //4 for a buffer
                     cvec_insert_back(temp_neigh, j); 
                     if (rijlist){
                         for (k=0; k<3; k++)
@@ -640,6 +674,12 @@ int build_neighborlist_cell_rvec(void *kimmdl)
         }
 
         size_total *= size[i];
+    }
+
+    if (size_total > 1000000000){
+        printf("%i x %i x %i ?! You thinks me a bit ambitious.\n", size[0], size[1], size[2]);
+        printf("Check if you have particles at 1e10 or try implementing a hash cell list.\n");
+        printf("Attempting to proceed...\n");
     }
 
     /* initialize the cells for the neighbors */ 
@@ -897,12 +937,21 @@ int build_neighborlist_cell(void *kimmdl)
     int size_total = 1;
     
     for (i=0; i<3; i++){
-        double rtemp = sqrt(cellf[3*0+i]*cellf[3*0+i] + cellf[3*1+i]*cellf[3*1+i] + cellf[3*2+i]*cellf[3*2+i]);
+        double rtemp = sqrt(cellf[3*0+i]*cellf[3*0+i] 
+                          + cellf[3*1+i]*cellf[3*1+i] 
+                          + cellf[3*2+i]*cellf[3*2+i]);
+
         if (box == 0) rtemp *= factor[i]/sqrt(3.0);
         size[i] = (int)((rtemp / R)*(max[i]-min[i])) + 1;
         size_total *= size[i];
     }
-    
+   
+    if (size_total > 1000000000){
+        printf("%i x %i x %i ?! You thinks me a bit ambitious.\n", size[0], size[1], size[2]);
+        printf("Check if you have particles at 1e10 or try implementing a hash cell list.\n");
+        printf("Attempting to proceed...\n");
+    }
+ 
     cvec **cells = (cvec**)malloc(sizeof(cvec*)*size_total);
     int *hash    =   (int*)malloc(sizeof(int)*size_total);
     for (i=0; i<size_total; i++){
