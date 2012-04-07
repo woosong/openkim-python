@@ -1,6 +1,10 @@
 Python interface to Open KIM API
 
 This requires KIM_DIR set, and also KIM_DYNAMIC=yes.
+Also, for installation using setup.py, needs a version
+of numpy after 1.2 (does not work) but before 1.6.1 (does). 
+We are not sure when the necessary changes were made.
+
 
 Neighbor locator and iterator are supported by default locator/iterator functions that can be used,
 with the python test delivering the actual neighbor list in the right structure.

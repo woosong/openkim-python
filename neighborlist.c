@@ -7,6 +7,7 @@
 #include "cvec.h"
 #include "neighborlist.h"
 
+
 /* Define neighborlist structure */
 typedef struct
 {
@@ -48,7 +49,7 @@ int initialize(void *kimmdl){
     status = KIM_API_set_data(kimmdl, "neighObject", 1, nl);
     status = KIM_API_set_data(kimmdl, "get_neigh", 1, (void*)&get_neigh);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__, "get numberOfParticles", status);
-  
+
     return status;
 }
 
@@ -78,6 +79,13 @@ int free_neigh_object(void* pkim) {
 
 int cleanup(void *pkim){
     free_neigh_object(pkim);
+
+    /* still debating if this is necessary.  valgrind gives errors
+       when it is present, so leaving out for now.  also give a 40byte leak
+       when not turned on.  the former seems much worse */
+/*    int status;
+    NeighList *nl = (NeighList*) KIM_API_get_data(pkim, "neighObject", &status);
+    safefree(nl);*/
     return KIM_STATUS_OK;
 }
 
@@ -331,6 +339,12 @@ int set_cell(int S1, double* Cell, int S2, int* PBC){
     return 0;
 }
 
+inline double fmod1(double a){
+    double m = a - ((int)a);
+    if (m >= -1e-8)
+        return m;
+    return m + 1.0;
+}
 
 void transform(double coords[3], double cell[9], double out[3]){
    int i;
@@ -450,10 +464,8 @@ int build_neighborlist_allall(void *kimmdl)
             if (i != j){
                 for (k=0; k<3; k++){
                     dx[k] = ncoords[3*j+k] - ncoords[3*i+k];
-                    if (pbc[k] != 0){
-                        while (fabs(dx[k]) > 0.5)  // boxside is 1.0
-                            dx[k] = dx[k] - (dx[k] > 0 ? 1: -1);
-                    }
+                    if (pbc[k] != 0)
+                        dx[k] = fmod1(dx[k]);
                 }
                
                 transform(dx, cellf, ds); 
@@ -501,10 +513,10 @@ int build_neighborlist_allall(void *kimmdl)
 // this version works for rvec only - it would be inefficient 
 // to combine this with the other
 //========================================================================
-inline void coords_to_index(double *x, int *size, int *index){   
+inline void coords_to_index(double *x, int *size, int *index, double *max, double *min){   
     int i;
     for (i=0; i<3; i++)
-        index[i] = (int)(x[i] * size[i]);
+        index[i] = (int)(((x[i]-min[i])/(max[i]-min[i]) - 1e-14) * size[i]);
 }
 
 inline int mod_rvec(int a, int b, int p, int *image){
@@ -546,7 +558,7 @@ int build_neighborlist_cell_rvec(void *kimmdl)
 
     /* if the user got here by mistake, correct it */
     if (nl == NULL)  initialize(kimmdl);
- 
+
     /* reset the NeighList object to refill */
     free_neigh_object(kimmdl);
     nl->iteratorId     = -1;
@@ -561,12 +573,25 @@ int build_neighborlist_cell_rvec(void *kimmdl)
     R  = *cutoff;
     R2 = (*cutoff)*(*cutoff);
 
+    /* convert the coordinates to [0.0,1.0] for peiodic sides
+       and find the side length of those that are not */
+    double min[3] = {0.0,0.0,0.0};
+    double max[3] = {1.0,1.0,1.0};
     ncoords = (double*)malloc(sizeof(double)*(*numberOfParticles)*3);
-    for (i=0; i<*numberOfParticles; i++)
+    for (i=0; i<*numberOfParticles; i++){
         transform(&coords[i*3], cellr, &ncoords[i*3]);
+        for (j=0; j<3; j++){
+            if (pbc[j] == 0){
+                if (max[j] < ncoords[3*i+j]) max[j] = ncoords[3*i+j];
+                if (min[j] > ncoords[3*i+j]) min[j] = ncoords[3*i+j];
+            }
+            else 
+                ncoords[3*i+j] = fmod1(ncoords[3*i+j]);
+        }
+    }
 
     /* all of this to make the perfect box size for the cells */
-    // create unit vectors along the cell, column vectors
+    /* create unit vectors along the cell, column vectors */
     double span[9];
     for (i=0; i<3; i++){
         double len = 0.0;
@@ -576,6 +601,7 @@ int build_neighborlist_cell_rvec(void *kimmdl)
             span[3*j+i] = cellf[3*j+i]/sqrt(len);
     }
 
+    /* the smallest box needs to include the slanty-ness */
     double factor[3];
     for (i=0; i<3; i++){
         double tcos, tsin;
@@ -591,46 +617,50 @@ int build_neighborlist_cell_rvec(void *kimmdl)
         }
         factor[i] = sinmin;
     }
-    
+
     /* make the cell box */
+    double length[3];
     int size[3];
     int size_total = 1;
     
+    /* figure out how big the cells need to be */
     for (i=0; i<3; i++){
         double rtemp = sqrt(cellf[3*0+i]*cellf[3*0+i] 
                           + cellf[3*1+i]*cellf[3*1+i] 
                           + cellf[3*2+i]*cellf[3*2+i]);
         if (box == 0) rtemp *= factor[i]/sqrt(3.0);
-        size[i] = (int)(rtemp / R);
+        size[i] = (int)((rtemp / R) * (max[i]-min[i]));
         copies[i] = 1;
 
-        if (size[i] == 0){
+        /* if the cell is smaller than cutoff, make sure
+           there are more copies to be periodic */
+        if (size[i] <= 0){
             size[i] = 1;
             copies[i] = (int)(R/rtemp) + 1;
         }
 
         size_total *= size[i];
     }
-    
+
+    /* initialize the cells for the neighbors */ 
     cvec **cells = (cvec**)malloc(sizeof(cvec*)*size_total);
-    int *hash    =   (int*)malloc(sizeof(int)*size_total);
     for (i=0; i<size_total; i++){
         cells[i] = (cvec*)malloc(sizeof(cvec));
-        hash[i]  = 0;
-        cvec_init(cells[i], 4);
+        cvec_init(cells[i], 128);
     }
 
+    /* convert all particles to cells */
     int index[3];
     for (i=0; i<*numberOfParticles; i++){
-        coords_to_index(&ncoords[3*i], size, index);
-        cvec_insert_back(cells[index[0] + index[1]*size[0] 
-                                        + index[2]*size[0]*size[1]], i);
+        coords_to_index(&ncoords[3*i], size, index, max, min);
+        int t = index[0] + index[1]*size[0] + index[2]*size[0]*size[1];
+        cvec_insert_back(cells[t], i);
     }
 
     cvec *temp_neigh = (cvec*)malloc(sizeof(cvec));
     dvec *temp_rij   = (dvec*)malloc(sizeof(dvec));
-    cvec_init(temp_neigh, 4);
-    dvec_init(temp_rij,   4);
+    cvec_init(temp_neigh, (*numberOfParticles));
+    dvec_init(temp_rij,   (*numberOfParticles));
    
     int total = 0;
     int neighbors;
@@ -645,19 +675,22 @@ int build_neighborlist_cell_rvec(void *kimmdl)
     for (i=0; i<*numberOfParticles; i++){
         neighbors = 0;
         /* translate back to a cell id */
-        coords_to_index(&ncoords[3*i], size, index);
-        
-        /* loop over the neighboring cells */
+        coords_to_index(&ncoords[3*i], size, index, max, min);
+
+        /* loop over the neighboring cells, more than one if the box is small */
         for (tt[0]=-copies[0]; tt[0]<=copies[0]; tt[0]++){
         for (tt[1]=-copies[1]; tt[1]<=copies[1]; tt[1]++){
         for (tt[2]=-copies[2]; tt[2]<=copies[2]; tt[2]++){
             int goodcell = 1;    
+            /* wrap the cell around as necessary 
+               and if it isn't periodic, don't count the wrap around */
             for (j=0; j<3; j++){
                 tix[j] = mod_rvec(index[j]+tt[j],size[j]-1,pbc[j],&image[j]);
                 if (pbc[j] < image[j])
                     goodcell=0;
             }
-        
+
+            /* GTG? */
             if (goodcell){
                 int ind = tix[0] + tix[1]*size[0] + tix[2]*size[0]*size[1];
                 cvec *cell = cells[ind];
@@ -671,16 +704,19 @@ int build_neighborlist_cell_rvec(void *kimmdl)
                     for (k=0; k<3; k++){
                         dx[k] = ncoords[3*n+k] - ncoords[3*i+k];
                 
+                        /* subtract off the image number in [0,1] box */
                         if (image[k])
                             dx[k] += tt[k];
                     }
        
                     /* take back to the curvy cell */
                     transform(dx, cellf, ds);
+
+                    /* find the distance in real space */
                     for (k=0; k<3; k++) 
                         dist += ds[k]*ds[k];
 
-                    /* do we have a neighbor */
+                    /* do we have a neighbor and are not ourselves */
                     if (dist > 1e-10 && dist < R2){ 
                         cvec_insert_back(temp_neigh, n);
                         for (k=0; k<3; k++)
@@ -689,7 +725,7 @@ int build_neighborlist_cell_rvec(void *kimmdl)
                     }
                 }
             }
-        } } }
+        } } } 
         /* update that particles list */
         nl->HalfNNeighbors[i] = neighbors;
         nl->NNeighbors[i] = neighbors;
@@ -714,7 +750,6 @@ int build_neighborlist_cell_rvec(void *kimmdl)
     safefree(temp_neigh);
     safefree(temp_rij);
     safefree(ncoords);
-    safefree(hash);
 
     nl->ready = 1; 
     return status;
@@ -817,10 +852,21 @@ int build_neighborlist_cell(void *kimmdl)
     R  = *cutoff;
     R2 = (*cutoff)*(*cutoff);
 
+    double min[3] = {0.0,0.0,0.0};
+    double max[3] = {1.0,1.0,1.0};
     ncoords = (double*)malloc(sizeof(double)*(*numberOfParticles)*3);
-    for (i=0; i<*numberOfParticles; i++)
+    for (i=0; i<*numberOfParticles; i++){
         transform(&coords[i*3], cellr, &ncoords[i*3]);
-
+        for (j=0; j<3; j++){
+            if (pbc[j] == 0){
+                if (max[j] < ncoords[3*i+j]) max[j] = ncoords[3*i+j];
+                if (min[j] > ncoords[3*i+j]) min[j] = ncoords[3*i+j];
+            }
+            else 
+                ncoords[3*i+j] = fmod1(ncoords[3*i+j]);
+        }
+    }
+ 
     /* all of this to make the perfect box size for the cells */
     // create unit vectors along the cell, column vectors
     double span[9];
@@ -853,7 +899,7 @@ int build_neighborlist_cell(void *kimmdl)
     for (i=0; i<3; i++){
         double rtemp = sqrt(cellf[3*0+i]*cellf[3*0+i] + cellf[3*1+i]*cellf[3*1+i] + cellf[3*2+i]*cellf[3*2+i]);
         if (box == 0) rtemp *= factor[i]/sqrt(3.0);
-        size[i] = (int)(rtemp / R) + 1;
+        size[i] = (int)((rtemp / R)*(max[i]-min[i])) + 1;
         size_total *= size[i];
     }
     
@@ -867,7 +913,7 @@ int build_neighborlist_cell(void *kimmdl)
 
     int index[3];
     for (i=0; i<*numberOfParticles; i++){
-        coords_to_index(&ncoords[3*i], size, index);
+        coords_to_index(&ncoords[3*i], size, index, max, min);
         cvec_insert_back(cells[index[0] + index[1]*size[0] + index[2]*size[0]*size[1]], i);
     }
 
@@ -880,7 +926,7 @@ int build_neighborlist_cell(void *kimmdl)
 
     for (i=0; i<*numberOfParticles; i++){
         neighbors = 0;
-        coords_to_index(&ncoords[3*i], size, index);
+        coords_to_index(&ncoords[3*i], size, index, max, min);
         cvec *ncells = get_relevant_cells(index, size, hash);
 
         for (l=0; l<ncells->elems; l++){
@@ -895,10 +941,8 @@ int build_neighborlist_cell(void *kimmdl)
                     for (k=0; k<3; k++){
                         dx[k] = ncoords[3*n+k] - ncoords[3*i+k];
                     
-                        if (pbc[k] != 0){
-                            while (fabs(dx[k]) > 0.5)
-                                dx[k] = dx[k] - (dx[k] > 0 ? 1: -1);
-                        }    
+                        if (pbc[k] != 0)
+                            dx[k] = fmod1(dx[k]);
                     }
                
                     transform(dx, cellf, ds);
