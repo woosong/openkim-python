@@ -23,19 +23,19 @@ typedef struct
    The c method to return the neighbor pointer, regardless of if it 
    came from python or the c libraries
 */
-int build_neighborlist_cell(void *kimmdl);
-int build_neighborlist_cell_rvec(void *kimmdl);
-int build_neighborlist_allall(void *kimmdl);
-int free_neigh_object(void *kimmdl);
+int nbl_build_neighborlist_cell(void *kimmdl);
+int nbl_build_neighborlist_cell_rvec(void *kimmdl);
+int nbl_build_neighborlist_allall(void *kimmdl);
+int nbl_free_neigh_object(void *kimmdl);
 
-int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
+int nbl_get_neigh(void* kimmdl, int *mode, int *request, int* atom,
               int* numnei, int** nei1atom, double** Rij);
 
 
-int initialize(void *kimmdl){
+int nbl_initialize(void *kimmdl){
     int status;
 
-    free_neigh_object(kimmdl);               
+    nbl_free_neigh_object(kimmdl);               
 
     // setup a blank neighborlist
     NeighList *nl = (NeighList*)malloc(sizeof(NeighList));
@@ -47,7 +47,7 @@ int initialize(void *kimmdl){
     nl->ready          = 0;
 
     status = KIM_API_set_data(kimmdl, "neighObject", 1, nl);
-    status = KIM_API_set_data(kimmdl, "get_neigh", 1, (void*)&get_neigh);
+    status = KIM_API_set_data(kimmdl, "get_neigh", 1, (void*)&nbl_get_neigh);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__, "get numberOfParticles", status);
 
     return status;
@@ -58,7 +58,7 @@ void safefree(void *ptr) {
         free(ptr);
 }
 
-int free_neigh_object(void* pkim) {
+int nbl_free_neigh_object(void* pkim) {
     NeighList *nl;
     int status;
 
@@ -77,8 +77,8 @@ int free_neigh_object(void* pkim) {
     return status;
 }
 
-int cleanup(void *pkim){
-    free_neigh_object(pkim);
+int nbl_cleanup(void *pkim){
+    nbl_free_neigh_object(pkim);
 
     /* still debating if this is necessary.  valgrind gives errors
        when it is present, so leaving out for now.  also give a 40byte leak
@@ -94,10 +94,10 @@ int cleanup(void *pkim){
    and set it through the KIM API calls
 */
 
-int set_neigh_object(void* kimmdl, int sz1, int* NNeighbors, 
-                                   int sz2, int* HalfNNeighbors, 
-                                   int sz3, int* neighborList, 
-                                   int sz4, double* RijList) 
+int nbl_set_neigh_object(void* kimmdl, int sz1, int* NNeighbors, 
+                                       int sz2, int* HalfNNeighbors, 
+                                       int sz3, int* neighborList, 
+                                       int sz4, double* RijList) 
 {
     //int set_neigh_object(void* kimmdl, int* NNeighbors, int* neighborList, double* RijList) {
     NeighList *nl;
@@ -105,11 +105,11 @@ int set_neigh_object(void* kimmdl, int sz1, int* NNeighbors,
 
     nl = (NeighList*) KIM_API_get_data(kimmdl, "neighObject", &status);
     if (KIM_STATUS_OK == status) {
-        free_neigh_object(kimmdl);
+        nbl_free_neigh_object(kimmdl);
     };
 
     if (nl == NULL)
-        initialize(kimmdl);
+        nbl_initialize(kimmdl);
 
     nl->ready          = 1; 
     nl->iteratorId     = -1;
@@ -131,7 +131,7 @@ int set_neigh_object(void* kimmdl, int sz1, int* NNeighbors,
 static int nclusteratoms = 0;
 static int ndim = 3;
 
-int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
+int nbl_get_neigh(void* kimmdl, int *mode, int *request, int* atom,
               int* numnei, int** nei1atom, double** Rij)
 {
 
@@ -159,9 +159,9 @@ int get_neigh(void* kimmdl, int *mode, int *request, int* atom,
 
    /* if the user got here by mistake, correct it */
    if (nl == NULL)
-        initialize(kimmdl);
+        nbl_initialize(kimmdl);
    if (!nl->ready)
-        build_neighborlist_cell(kimmdl);
+        nbl_build_neighborlist(kimmdl);
 
    /* figure out the neighbor locator type */
    method = KIM_API_get_NBC_method(pkim, &status);
@@ -324,7 +324,7 @@ void printmat(double *m){
     }
 }
 
-int set_cell(int S1, double* Cell, int S2, int* PBC){
+int nbl_set_cell(int S1, double* Cell, int S2, int* PBC){
     if (S1 != 9) printf("WARNING: cell size greater than 9.  Taking first 9 elements\n");
     if (S2 != 3) printf("WARNING: pbc size greater than 3.  Taking first 3 elements\n");
  
@@ -355,7 +355,7 @@ void transform(double coords[3], double cell[9], double out[3]){
 /* =====================================================
    call this, and it will decide which to use
    ====================================================*/
-int build_neighborlist(void *kimmdl){
+int nbl_build_neighborlist(void *kimmdl){
     int rvec;
     int status;
     char *method;
@@ -370,12 +370,12 @@ int build_neighborlist(void *kimmdl){
        use the all neighbor list, can't assume 
        anything about periodic conditions or cell */
     if (init == 0)
-        return build_neighborlist_allall(kimmdl);
+        return nbl_build_neighborlist_allall(kimmdl);
 
     /* otherwise, the cell works for all types */
     if (!rvec)
-        return build_neighborlist_cell_rvec(kimmdl);
-    return build_neighborlist_cell(kimmdl);
+        return nbl_build_neighborlist_cell_rvec(kimmdl);
+    return nbl_build_neighborlist_cell(kimmdl);
 }
 
 
@@ -383,7 +383,7 @@ int build_neighborlist(void *kimmdl){
   the simple all-all neighbor list
   works for all neighborlists including rvec
   ======================================================*/
-int build_neighborlist_allall(void *kimmdl)
+int nbl_build_neighborlist_allall(void *kimmdl)
 {
     int status;
     int* numberOfParticles;
@@ -428,10 +428,10 @@ int build_neighborlist_allall(void *kimmdl)
 
     /* if the user got here by mistake, correct it */
     if (nl == NULL)
-        initialize(kimmdl);
+        nbl_initialize(kimmdl);
  
     /* reset the NeighList object to refill */
-    free_neigh_object(kimmdl);
+    nbl_free_neigh_object(kimmdl);
     
     nl->iteratorId     = -1;
     nl->NNeighbors     = (int*)malloc(sizeof(int)*(*numberOfParticles));
@@ -568,7 +568,7 @@ inline int mod_rvec(int a, int b, int p, int *image){
 }
 
 
-int build_neighborlist_cell_rvec(void *kimmdl)
+int nbl_build_neighborlist_cell_rvec(void *kimmdl)
 {
     int i, j, k;
     int status;
@@ -591,10 +591,10 @@ int build_neighborlist_cell_rvec(void *kimmdl)
         KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
 
     /* if the user got here by mistake, correct it */
-    if (nl == NULL)  initialize(kimmdl);
+    if (nl == NULL)  nbl_initialize(kimmdl);
 
     /* reset the NeighList object to refill */
-    free_neigh_object(kimmdl);
+    nbl_free_neigh_object(kimmdl);
     nl->iteratorId     = -1;
     nl->NNeighbors     = (int*)malloc(sizeof(int)*(*numberOfParticles));
     nl->HalfNNeighbors = (int*)malloc(sizeof(int)*(*numberOfParticles));
@@ -831,7 +831,7 @@ cvec *get_relevant_cells(int *index, int *size, int *hash){
 }
 
 
-int build_neighborlist_cell(void *kimmdl)
+int nbl_build_neighborlist_cell(void *kimmdl)
 {
     int status;
     int* numberOfParticles;
@@ -873,10 +873,10 @@ int build_neighborlist_cell(void *kimmdl)
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
     /* if the user got here by mistake, correct it */
     if (nl == NULL)
-        initialize(kimmdl);
+        nbl_initialize(kimmdl);
  
     /* reset the NeighList object to refill */
-    free_neigh_object(kimmdl);
+    nbl_free_neigh_object(kimmdl);
     nl->iteratorId     = -1;
     nl->NNeighbors     = (int*)malloc(sizeof(int)*(*numberOfParticles));
     nl->HalfNNeighbors = (int*)malloc(sizeof(int)*(*numberOfParticles));
