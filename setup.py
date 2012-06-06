@@ -14,7 +14,7 @@ kimservice_module = Extension('_kimservice',
     swig_opts=['-c++'],
     include_dirs=[kim_api_dir],
     library_dirs=[kim_api_dir],
-    libraries=['kim']
+    libraries=['kim','gfortran']
     )
 
 kimneighborlist_module = Extension('_kimneighborlist',
