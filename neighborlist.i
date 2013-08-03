@@ -17,5 +17,6 @@ import_array();
 %apply (int DIM1, double *IN_ARRAY1) {(int sz4, double* RijList)}
 %apply (int DIM1, double *IN_ARRAY1) {(int S1, double* Cell)}
 %apply (int DIM1, int *IN_ARRAY1)    {(int S2, int* PBC)}
+%apply (int DIM1, int *IN_ARRAY1)    {(int N1, int* Ghosts)}
 %include "neighborlist.h"
 

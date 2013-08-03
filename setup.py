@@ -6,7 +6,7 @@ setup.py file for SWIG kimservice
 from numpy.distutils.core import setup, Extension
 import os
 
-kim_dir = os.environ['KIM_DIR']
+kim_dir = "/home/openkim/openkim-api/" #os.environ['KIM_DIR']
 kim_api_dir = kim_dir + 'KIM_API/'
 
 kimservice_module = Extension('_kimservice',
