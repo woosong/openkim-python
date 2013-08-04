@@ -23,10 +23,9 @@ typedef struct
    The c method to return the neighbor pointer, regardless of if it 
    came from python or the c libraries
 */
+int nbl_build_neighborlist_cell_rvec(void *kimmdl);
 int nbl_build_neighborlist_cell_opbc(void *kimmdl);
 int nbl_build_neighborlist_cell_pure(void *kimmdl);
-int nbl_build_neighborlist_cell_rvec(void *kimmdl);
-int nbl_build_neighborlist_allall(void *kimmdl);
 int nbl_free_neigh_object(void *kimmdl);
 
 int nbl_get_neigh(void* kimmdl, int *mode, int *request, int* atom,
@@ -907,7 +906,7 @@ int nbl_build_neighborlist_cell_pure(void *kimmdl)
     safefree(method);
 
     // get the data necessary for the neighborlist 
-    KIM_API_getm_data(kimmdl, &status, 3*3,
+    KIM_API_getm_data(kimmdl, &status, 4*3,
             "numberContributingParticles",    &numberContributingParticles,     1,
             "numberOfParticles",    &numberOfParticles,     1,
             "coordinates",          &coords,                1,
@@ -939,7 +938,7 @@ int nbl_build_neighborlist_cell_pure(void *kimmdl)
     double dx[3];
     double R, R2, dist;
 
-    R  = 15;//*cutoff;
+    R  = *cutoff;
     R2 = R*R;
 
     double min[3] = { 1e10,  1e10,  1e10};
