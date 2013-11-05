@@ -7,7 +7,7 @@
 */
 int nbl_initialize(void* kimmdl); 
 int nbl_set_cell(int S1, double* Cell, int S2, int* PBC);
-int nbl_set_ghosts(int N1, int* Ghosts);
+int nbl_set_ghosts(int N1, int* Ghosts, int ishalf);
 int nbl_build_neighborlist(void *kimmdl);
 int nbl_set_neigh_object(void* kimmdl, int sz1, int* NNeighbors, 
                                    int sz2, int* HalfNNeighbors, 

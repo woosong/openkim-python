@@ -19,8 +19,8 @@ typedef struct
    double* RijList;
 } NeighList;
 
-/* 
-   The c method to return the neighbor pointer, regardless of if it 
+/*
+   The c method to return the neighbor pointer, regardless of if it
    came from python or the c libraries
 */
 int nbl_build_neighborlist_cell_rvec(void *kimmdl);
@@ -35,7 +35,7 @@ int nbl_get_neigh(void* kimmdl, int *mode, int *request, int* atom,
 int nbl_initialize(void *kimmdl){
     int status;
 
-    nbl_free_neigh_object(kimmdl);               
+    nbl_free_neigh_object(kimmdl);
 
     // setup a blank neighborlist
     NeighList *nl = (NeighList*)malloc(sizeof(NeighList));
@@ -90,14 +90,14 @@ int nbl_cleanup(void *pkim){
 }
 
 /*
-   Use this method to produce a neighbor list in python 
+   Use this method to produce a neighbor list in python
    and set it through the KIM API calls
 */
 
-int nbl_set_neigh_object(void* kimmdl, int sz1, int* NNeighbors, 
-                                       int sz2, int* HalfNNeighbors, 
-                                       int sz3, int* neighborList, 
-                                       int sz4, double* RijList) 
+int nbl_set_neigh_object(void* kimmdl, int sz1, int* NNeighbors,
+                                       int sz2, int* HalfNNeighbors,
+                                       int sz3, int* neighborList,
+                                       int sz4, double* RijList)
 {
     NeighList *nl;
     int status;
@@ -110,18 +110,18 @@ int nbl_set_neigh_object(void* kimmdl, int sz1, int* NNeighbors,
     if (nl == NULL)
         nbl_initialize(kimmdl);
 
-    nl->ready          = 1; 
+    nl->ready          = 1;
     nl->iteratorId     = -1;
     nl->NNeighbors     = (int*)malloc(sizeof(int)*sz1);
     nl->HalfNNeighbors = (int*)malloc(sizeof(int)*sz2);
     nl->neighborList   = (int*)malloc(sizeof(int)*sz3);
     nl->RijList        = (double*)malloc(sizeof(double)*sz4);
-    
+
     memcpy(nl->NNeighbors, NNeighbors, sizeof(int)*sz1);
     memcpy(nl->HalfNNeighbors, HalfNNeighbors, sizeof(int)*sz2);
     memcpy(nl->neighborList, neighborList, sizeof(int)*sz3);
     memcpy(nl->RijList, RijList, sizeof(double)*sz4);
-   
+
     return status;
 }
 
@@ -250,8 +250,8 @@ int nbl_get_neigh(void* kimmdl, int *mode, int *request, int* atom,
 
 
 /*===========================================================================
-    A standard library of neighbor locators for use with 
-    the python KIM API.  
+    A standard library of neighbor locators for use with
+    the python KIM API.
   ==========================================================================*/
 double cellf[9] = {1.0, 0.0, 0.0, /*|*/ 0.0, 1.0, 0.0, /*|*/ 0.0, 0.0, 1.0};
 double cellr[9] = {1.0, 0.0, 0.0, /*|*/ 0.0, 1.0, 0.0, /*|*/ 0.0, 0.0, 1.0};
@@ -267,7 +267,7 @@ inline double det(double a11, double a12, double a21, double a22){
 
 inline double dot3(double *a, double *b){
     return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
-} 
+}
 
 inline double det3(double *mat){
     double dd = (mat[0]*mat[4]*mat[8] - mat[0]*mat[5]*mat[7] -
@@ -305,7 +305,7 @@ void transpose(double *m){
 
 void is_orthogonal(double *mat, int *ortho){
     int i, j;
-    
+
     for (i=0; i<3; i++){
         int or = 1;
         for (j=0; j<3; j++){
@@ -329,25 +329,35 @@ void printmat(double *m){
 int nbl_set_cell(int S1, double* Cell, int S2, int* PBC){
     if (S1 != 9) fprintf(stderr, "NBL: WARNING: cell size greater than 9.  Taking first 9 elements\n");
     if (S2 != 3) fprintf(stderr, "NBL: WARNING: pbc size greater than 3.  Taking first 3 elements\n");
- 
+
     memcpy(pbc, PBC, sizeof(int)*3);
     memcpy(cellf, Cell, sizeof(double)*9);
 
     is_orthogonal(cellf, ortho);
-    transpose(cellf);    
-    inverse(cellf, cellr);        
-    
+    transpose(cellf);
+    inverse(cellf, cellr);
+
     init = 1;
     return 0;
 }
 
-int nbl_set_ghosts(int N1, int *Ghosts){
+int nbl_set_ghosts(int N1, int *Ghosts, int ishalf){
+    int i=0;
     if (ghosts != NULL)
         free(ghosts);
 
-    nghosts = N1;
-    ghosts = (int*)malloc(sizeof(int)*nghosts);
-    memcpy(ghosts, Ghosts, sizeof(int)*nghosts);
+    int nparticles = N1;
+    nghosts = nparticles;
+    ghosts = (int*)malloc(sizeof(int)*nparticles);
+    memcpy(ghosts, Ghosts, sizeof(int)*nparticles);
+
+    if (ishalf){
+        nghosts = 0;
+        for (i=0; i<nparticles; i++){
+            if (!ghosts[i])
+                nghosts++;
+        }
+    }
     return 0;
 }
 
@@ -401,10 +411,10 @@ int nbl_build_neighborlist(void *kimmdl){
 
 //========================================================================
 // the more advanced cell neighbor locator
-// this version works for rvec only - it would be inefficient 
+// this version works for rvec only - it would be inefficient
 // to combine this with the other
 //========================================================================
-inline void coords_to_index(double *x, int *size, int *index, double *max, double *min){   
+inline void coords_to_index(double *x, int *size, int *index, double *max, double *min){
     int i;
     for (i=0; i<3; i++)
         index[i] = (int)(((x[i]-min[i])/(max[i]-min[i]) - 1e-14) * size[i]);
@@ -431,26 +441,33 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
     int status;
     int ishalf = 0;
     int* numberOfParticles;
+    int* numberContributingParticles;
     double* coords;
-    double* ncoords; 
+    double* ncoords;
     double* cutoff;
     NeighList *nl;
- 
+
+    /* get the preferred neighborlist style from the API */
+    char *method = KIM_API_get_NBC_method(kimmdl, &status);
+    if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
+    if (!strcmp(method, "NEIGH_RVEC_H"))  ishalf = 1;
+    safefree(method);
+
     /* get the data necessary for the neighborlist */
-    KIM_API_getm_data(kimmdl, &status, 3*3,
-            "numberOfParticles",    &numberOfParticles,     1,
-            "coordinates",          &coords,                1,
-            "cutoff",               &cutoff,                1);
-    if (KIM_STATUS_OK > status) 
+    KIM_API_getm_data(kimmdl, &status, 4*3,
+            "numberContributingParticles",    &numberContributingParticles,     ishalf,
+            "numberOfParticles",              &numberOfParticles,     1,
+            "coordinates",                    &coords,                1,
+            "cutoff",                         &cutoff,                1);
+    if (KIM_STATUS_OK > status)
         KIM_API_report_error(__LINE__, __FILE__, "KIM_API_getm_data", status);
 
     nl = (NeighList*) KIM_API_get_data(kimmdl, "neighObject", &status);
-    if (KIM_STATUS_OK > status) 
+    if (KIM_STATUS_OK > status)
         KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
 
-    char *method = KIM_API_get_NBC_method(kimmdl, &status);
-    if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
-    if (!strcmp(method, "NEIGH_RVEC_H")) ishalf = 1;
+    if (ishalf)
+        *numberContributingParticles = *numberOfParticles;
 
     /* if the user got here by mistake, correct it */
     if (nl == NULL)  nbl_initialize(kimmdl);
@@ -481,7 +498,7 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
                 if (max[j] < ncoords[3*i+j]) max[j] = ncoords[3*i+j];
                 if (min[j] > ncoords[3*i+j]) min[j] = ncoords[3*i+j];
             }
-            else 
+            else
                 ncoords[3*i+j] = fmod1(ncoords[3*i+j]);
         }
     }
@@ -493,7 +510,7 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
         double len = 0.0;
         for (j=0; j<3; j++)
             len += cellf[3*j+i]*cellf[3*j+i];
-        for (j=0; j<3; j++) 
+        for (j=0; j<3; j++)
             span[3*j+i] = cellf[3*j+i]/sqrt(len);
     }
 
@@ -504,8 +521,8 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
         double sinmin = 1.0;
         for (j=0; j<3; j++){
             if (i != j){
-                tcos = span[3*0+i]*span[3*0+j] 
-                     + span[3*1+i]*span[3*1+j] 
+                tcos = span[3*0+i]*span[3*0+j]
+                     + span[3*1+i]*span[3*1+j]
                      + span[3*2+i]*span[3*2+j];
                 tsin = sqrt(1 - tcos*tcos);
                 if (tsin < sinmin) sinmin = tsin;
@@ -517,11 +534,11 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
     /* make the cell box */
     int size[3];
     int size_total = 1;
-    
+
     /* figure out how big the cells need to be */
     for (i=0; i<3; i++){
-        double rtemp = sqrt(cellf[3*0+i]*cellf[3*0+i] 
-                          + cellf[3*1+i]*cellf[3*1+i] 
+        double rtemp = sqrt(cellf[3*0+i]*cellf[3*0+i]
+                          + cellf[3*1+i]*cellf[3*1+i]
                           + cellf[3*2+i]*cellf[3*2+i]);
         if (box == 0) rtemp *= factor[i]/sqrt(3.0);
         size[i] = (int)((rtemp / R) * (max[i]-min[i]));
@@ -543,7 +560,7 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
         fprintf(stderr, "NBL: Attempting to proceed...\n");
     }
 
-    /* initialize the cells for the neighbors */ 
+    /* initialize the cells for the neighbors */
     cvec **cells = (cvec**)malloc(sizeof(cvec*)*size_total);
     for (i=0; i<size_total; i++){
         cells[i] = (cvec*)malloc(sizeof(cvec));
@@ -562,7 +579,7 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
     dvec *temp_rij   = (dvec*)malloc(sizeof(dvec));
     cvec_init(temp_neigh, (*numberOfParticles));
     dvec_init(temp_rij,   (*numberOfParticles));
-   
+
     int total = 0;
     int neighbors;
 
@@ -582,8 +599,8 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
         for (tt[0]=-copies[0]; tt[0]<=copies[0]; tt[0]++){
         for (tt[1]=-copies[1]; tt[1]<=copies[1]; tt[1]++){
         for (tt[2]=-copies[2]; tt[2]<=copies[2]; tt[2]++){
-            int goodcell = 1;    
-            /* wrap the cell around as necessary 
+            int goodcell = 1;
+            /* wrap the cell around as necessary
                and if it isn't periodic, don't count the wrap around */
             for (j=0; j<3; j++){
                 tix[j] = mod_rvec(index[j]+tt[j],size[j]-1,pbc[j],&image[j]);
@@ -598,7 +615,7 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
 
                 /* for every particle in that cell */
                 for (j=0; j<cell->elems; j++){
-                    int n = cvec_at(cell, j); 
+                    int n = cvec_at(cell, j);
 
                     if (!ishalf || (ishalf && (n >= i))){
                         /* find the distance vecs in our 1x1x1 box */
@@ -611,15 +628,15 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
                                 dx[k] += tt[k];
                         }
 
-                        // Need to be able to choose the half list 
+                        // Need to be able to choose the half list
                         // when n == i, or we are self forcing from an image.
                         // I do it with this fall through, choosing leftmost particles
-                        // treating exact equalities as a fallthrough 
+                        // treating exact equalities as a fallthrough
                         // FIXME - this appears to be correct! all less than.
                         if (ishalf && (n == i))
                             if (dx[0] < 0 ||
                                (dx[0] == 0 && dx[1] < 0) ||
-                               (dx[0] == 0 && dx[1] == 0 && dx[2] > 0))
+                               (dx[0] == 0 && dx[1] == 0 && dx[2] < 0))
                                 continue;
 
                         /* take back to the curvy cell */
@@ -639,11 +656,11 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
                     }
                 }
             }
-        } } } 
+        } } }
         /* update that particles list */
         nl->HalfNNeighbors[i] = neighbors;
         nl->NNeighbors[i] = neighbors;
-        
+
         total += neighbors;
     }
 
@@ -657,7 +674,7 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
     cvec_destroy(temp_neigh);
     dvec_destroy(temp_rij);
     for (i=0; i<size_total; i++){
-        cvec_destroy(cells[i]); 
+        cvec_destroy(cells[i]);
         safefree(cells[i]);
     }
     safefree(cells);
@@ -665,7 +682,7 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
     safefree(temp_rij);
     safefree(ncoords);
 
-    nl->ready = 1; 
+    nl->ready = 1;
     return status;
 }
 
@@ -690,17 +707,17 @@ cvec *get_relevant_cells(int *index, int *size, int *hash){
     cvec *list = (cvec*)malloc(sizeof(cvec));
     cvec_init(list, 27);
     int i,j,k;
- 
+
     for (i=index[0]-1; i<=index[0]+1; i++){
     for (j=index[1]-1; j<=index[1]+1; j++){
     for (k=index[2]-1; k<=index[2]+1; k++){
-        int ind = mod(i,size[0]-1,pbc[0]) 
+        int ind = mod(i,size[0]-1,pbc[0])
                 + mod(j,size[1]-1,pbc[1])*size[0]
                 + mod(k,size[2]-1,pbc[2])*size[0]*size[1];
         if (hash[ind] == 0){ hash[ind] = 1; cvec_insert_back(list, ind); }
     } } }
- 
-    return list;       
+
+    return list;
 }
 
 
@@ -708,23 +725,25 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
 {
     int status;
     int* numberOfParticles;
+    int* numberContributingParticles;
     double* coords;
-    double* ncoords; 
+    double* ncoords;
     double* cutoff;
     char *method;
     double *box;
     NeighList *nl;
- 
+
     int ishalf = 0;
-    
+
     /* get the preferred neighborlist style from the API */
     method = KIM_API_get_NBC_method(kimmdl, &status);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
-    if (!strcmp(method, "MI_OPBC_H"))  ishalf = 1; 
+    if (!strcmp(method, "MI_OPBC_H"))  ishalf = 1;
     safefree(method);
 
     /* get the data necessary for the neighborlist */
-    KIM_API_getm_data(kimmdl, &status, 4*3,
+    KIM_API_getm_data(kimmdl, &status, 5*3,
+            "numberContributingParticles",    &numberContributingParticles,     ishalf,
             "numberOfParticles",    &numberOfParticles,     1,
             "coordinates",          &coords,                1,
             "cutoff",               &cutoff,                1,
@@ -732,7 +751,7 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__, "KIM_API_getm_data", status);
 
     box[0] = cellf[0];
-    box[1] = cellf[4];  
+    box[1] = cellf[4];
     box[2] = cellf[8];
 
     nl = (NeighList*) KIM_API_get_data(kimmdl, "neighObject", &status);
@@ -740,7 +759,10 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
     /* if the user got here by mistake, correct it */
     if (nl == NULL)
         nbl_initialize(kimmdl);
- 
+
+    if (ishalf)
+        *numberContributingParticles = *numberOfParticles;
+
     /* reset the NeighList object to refill */
     nbl_free_neigh_object(kimmdl);
     nl->iteratorId     = -1;
@@ -761,7 +783,7 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
     }
 
     R  = *cutoff;
-    R2 = R*R; 
+    R2 = R*R;
 
     double min[3] = {0.0,0.0,0.0};
     double max[3] = {1.0,1.0,1.0};
@@ -773,15 +795,15 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
                 if (max[j] < ncoords[3*i+j]) max[j] = ncoords[3*i+j];
                 if (min[j] > ncoords[3*i+j]) min[j] = ncoords[3*i+j];
             }
-            else 
+            else
                 ncoords[3*i+j] = fmod1(ncoords[3*i+j]);
         }
     }
- 
+
     /* make the cell box */
     int size[3];
     int size_total = 1;
-    
+
     for (i=0; i<3; i++){
         double rtemp = cellf[3*i+i];
         size[i] = (int)((rtemp / R)*(max[i]-min[i])) + 1;
@@ -791,13 +813,13 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
         }
         size_total *= size[i];
     }
-   
+
     if (size_total > 1000000000){
         fprintf(stderr, "NBL: %i x %i x %i ?! You thinks me a bit ambitious.\n", size[0], size[1], size[2]);
         fprintf(stderr, "NBL: Check if you have particles at 1e10 or try implementing a hash cell list.\n");
         fprintf(stderr, "NBL: Attempting to proceed...\n");
     }
- 
+
     cvec **cells = (cvec**)malloc(sizeof(cvec*)*size_total);
     int *hash    =   (int*)malloc(sizeof(int)*size_total);
     for (i=0; i<size_total; i++){
@@ -816,7 +838,7 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
     dvec *temp_rij   = (dvec*)malloc(sizeof(dvec));
     cvec_init(temp_neigh, 4);
     dvec_init(temp_rij,   4);
-   
+
     int total = 0;
 
     for (i=0; i<*numberOfParticles; i++){
@@ -830,21 +852,21 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
             hash[cellindex] = 0;
 
             for (j=0; j<cell->elems; j++){
-                int n = cvec_at(cell, j); 
+                int n = cvec_at(cell, j);
                 if ((i != n) && ((ishalf==0) || ((ishalf!=0) && (n > i)))){
                     dist = 0.0;
                     for (k=0; k<3; k++){
                         dx[k] = ncoords[3*n+k] - ncoords[3*i+k];
-                    
+
                         if (pbc[k] != 0)
                             dx[k] = fmod1(dx[k]+0.5)-0.5;
                     }
-               
+
                     transform(dx, cellf, ds);
-                    for (k=0; k<3; k++) 
+                    for (k=0; k<3; k++)
                         dist += ds[k]*ds[k];
 
-                    if (dist < R2){ 
+                    if (dist < R2){
                         // atom j is a neighbor of atom i
                         cvec_insert_back(temp_neigh, n);
                         neighbors++;
@@ -854,7 +876,7 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
         }
         nl->HalfNNeighbors[i] = neighbors;
         nl->NNeighbors[i] = neighbors;
-        
+
         total += neighbors;
 
         cvec_destroy(ncells);
@@ -870,7 +892,7 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
     cvec_destroy(temp_neigh);
     dvec_destroy(temp_rij);
     for (i=0; i<size_total; i++){
-        cvec_destroy(cells[i]); 
+        cvec_destroy(cells[i]);
         safefree(cells[i]);
     }
     safefree(cells);
@@ -879,7 +901,7 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
     safefree(ncoords);
     safefree(hash);
 
-    nl->ready = 1; 
+    nl->ready = 1;
     return status;
 }
 
@@ -896,18 +918,18 @@ int nbl_build_neighborlist_cell_pure(void *kimmdl)
     double* cutoff;
     char *method;
     NeighList *nl;
- 
+
     int ishalf = 0;
-    
-    // get the preferred neighborlist style from the API 
+
+    // get the preferred neighborlist style from the API
     method = KIM_API_get_NBC_method(kimmdl, &status);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
-    if (!strcmp(method, "NEIGH_PURE_H"))  ishalf = 1; 
+    if (!strcmp(method, "NEIGH_PURE_H"))  ishalf = 1;
     safefree(method);
 
-    // get the data necessary for the neighborlist 
+    // get the data necessary for the neighborlist
     KIM_API_getm_data(kimmdl, &status, 4*3,
-            "numberContributingParticles",    &numberContributingParticles,     1,
+            "numberContributingParticles",    &numberContributingParticles,     ishalf,
             "numberOfParticles",    &numberOfParticles,     1,
             "coordinates",          &coords,                1,
             "cutoff",               &cutoff,                1);
@@ -915,24 +937,25 @@ int nbl_build_neighborlist_cell_pure(void *kimmdl)
 
     nl = (NeighList*) KIM_API_get_data(kimmdl, "neighObject", &status);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_data", status);
-    // if the user got here by mistake, correct it 
+    // if the user got here by mistake, correct it
     if (nl == NULL)
         nbl_initialize(kimmdl);
 
     // FIXME - this should be set elsewhere
-    *numberContributingParticles = *numberOfParticles;
-    if (*numberOfParticles != nghosts){
+    if (ishalf)
+        *numberContributingParticles = nghosts;
+    if (nghosts == 0){
         fprintf(stderr, "Ghost particles are not initialized, call nbl_set_ghosts");
         return 1;
     }
 
-    // reset the NeighList object to refill 
+    // reset the NeighList object to refill
     nbl_free_neigh_object(kimmdl);
     nl->iteratorId     = -1;
     nl->NNeighbors     = (int*)malloc(sizeof(int)*(*numberOfParticles));
     nl->HalfNNeighbors = (int*)malloc(sizeof(int)*(*numberOfParticles));
 
-    // begin the actual neighborlist calculation 
+    // begin the actual neighborlist calculation
     int i, j, k, ii, jj, kk;
     int neighbors;
     double dx[3];
@@ -950,15 +973,15 @@ int nbl_build_neighborlist_cell_pure(void *kimmdl)
         }
     }
 
-    // make the cell box 
+    // make the cell box
     int size[3];
     int size_total = 1;
-    
+
     for (i=0; i<3; i++){
         size[i] = (int)((max[i]-min[i])/R) + 1;
         size_total *= size[i];
     }
-   
+
     if (size_total > 1000000000){
         fprintf(stderr, "NBL: %i x %i x %i ?! You thinks me a bit ambitious.\n", size[0], size[1], size[2]);
         fprintf(stderr, "NBL: Check if you have particles at 1e10 or try implementing a hash cell list.\n");
@@ -979,7 +1002,7 @@ int nbl_build_neighborlist_cell_pure(void *kimmdl)
 
     cvec *temp_neigh = (cvec*)malloc(sizeof(cvec));
     cvec_init(temp_neigh, 4);
-   
+
     int total = 0;
 
     for (i=0; i<*numberOfParticles; i++){
@@ -994,15 +1017,15 @@ int nbl_build_neighborlist_cell_pure(void *kimmdl)
 
             cvec *cell = cells[ind];
             for (j=0; j<cell->elems; j++){
-                int n = cvec_at(cell, j); 
+                int n = cvec_at(cell, j);
                 if ((i != n) && ((ishalf==0) || ((ishalf!=0) && (n > i)))){
                     dist = 0.0;
                     for (k=0; k<3; k++){
                         dx[k] = coords[3*n+k] - coords[3*i+k];
                         dist += dx[k]*dx[k];
-                    } 
+                    }
 
-                    if (dist < R2){ 
+                    if (dist < R2){
                         cvec_insert_back(temp_neigh, n);
                         neighbors++;
                     }
@@ -1012,7 +1035,7 @@ int nbl_build_neighborlist_cell_pure(void *kimmdl)
 
         nl->HalfNNeighbors[i] = neighbors;
         nl->NNeighbors[i] = neighbors;
-        
+
         total += neighbors;
     }
 
@@ -1021,16 +1044,16 @@ int nbl_build_neighborlist_cell_pure(void *kimmdl)
 
     memcpy(nl->neighborList, temp_neigh->array, sizeof(int)*total);
 
-    // cleanup all the memory usage 
+    // cleanup all the memory usage
     cvec_destroy(temp_neigh);
     for (i=0; i<size_total; i++){
-        cvec_destroy(cells[i]); 
+        cvec_destroy(cells[i]);
         safefree(cells[i]);
     }
     safefree(cells);
     safefree(temp_neigh);
 
-    nl->ready = 1; 
+    nl->ready = 1;
     return status;
 }
 
