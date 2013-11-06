@@ -1,12 +1,13 @@
-#include "KIM_API_status.h"
-#include "KIM_API_C.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+
+#include "KIM_API_status.h"
+#include "KIM_API_C.h"
+
 #include "cvec.h"
 #include "neighborlist.h"
-
 
 /* Define neighborlist structure */
 typedef struct
@@ -143,8 +144,8 @@ int nbl_get_neigh(void* kimmdl, int *mode, int *request, int* atom,
    NeighList* nl;
    int i;
 
-   int cluster  = 0;
-   int ishalf   = 0;
+   int cluster = 0;
+   int ishalf  = 0;
 
    /* initialize numnei */
    *numnei = 0;
@@ -353,9 +354,15 @@ int nbl_set_ghosts(int N1, int *Ghosts, int ishalf){
 
     if (ishalf){
         nghosts = 0;
+        int sawghost = 0;
         for (i=0; i<nparticles; i++){
-            if (!ghosts[i])
+            if (!ghosts[i]){
+                if (sawghost)
+                    fprintf(stderr, "NBL: WARNING: real atoms found after ghost atoms in half list\n");
                 nghosts++;
+            } else {
+                sawghost = 1;
+            }
         }
     }
     return 0;
@@ -394,8 +401,8 @@ int nbl_build_neighborlist(void *kimmdl){
     /* if the user didn't specify the box, die
        we don't want to produce non-sense by accident */
     if (init == 0){
-        fprintf(stderr, "NBL: The neighborlist system has not been set up!\n");
-        fprintf(stderr, "NBL: Did you run nbl_set_cell?\n");
+        fprintf(stderr, "NBL: ERROR: The neighborlist system has not been set up!\n");
+        fprintf(stderr, "NBL: ERROR: Did you run nbl_set_cell?\n");
         return 1;
     }
 
@@ -404,7 +411,7 @@ int nbl_build_neighborlist(void *kimmdl){
     if (!opbc) return nbl_build_neighborlist_cell_opbc(kimmdl);
     if (!pure) return nbl_build_neighborlist_cell_pure(kimmdl);
 
-    fprintf(stderr, "NBL: No valid neighborlist setup was found!\n");
+    fprintf(stderr, "NBL: ERROR: No valid neighborlist setup was found!\n");
     return 1;
 }
 
