@@ -25,7 +25,7 @@ def run_kim_build_config(opt='--version'):
 
 def getdefault(conf, sect, key, default=None):
     try:
-        conf.get(sect, key)
+        return conf.get(sect, key)
     except configparser.NoSectionError as e:
         return default
     except configparser.NoOptionError as e:
@@ -59,12 +59,17 @@ def default_libs():
 
 options = {}
 conf = configparser.SafeConfigParser()
-setup_cfg = 'setup.cfg' if os.path.exists('setup.cfg') else 'setup.cfg.default'
+setup_cfg = 'setup.cfg' if os.path.exists('setup.cfg') else 'setup.cfg.example'
 conf.read(setup_cfg)
 
-options['include'] = getdefault(conf, 'build', 'include') or default_include()
-options['libdir'] = getdefault(conf, 'build', 'libdir') or default_libdir()
-options['libs'] = getdefault(conf, 'build', 'libs') or default_libs()
+options['include'] = getdefault(conf, 'kim-api', 'include') or default_include()
+options['libdir'] = getdefault(conf, 'kim-api', 'libdir') or default_libdir()
+options['libs'] = getdefault(conf, 'kim-api', 'libraries') or default_libs()
+
+for k,v in options.iteritems():
+    if not isinstance(v, list):
+        v = [a.strip() for a in v.split(' ')]
+        options[k] = v
 
 kimservice_module = Extension('_kimservice',
     sources=['kimservice.i'],
@@ -72,20 +77,20 @@ kimservice_module = Extension('_kimservice',
     include_dirs=options['include'],
     library_dirs=options['libdir'],
     libraries=options['libs']
-    )
+)
 
 kimneighborlist_module = Extension('_kimneighborlist',
     sources=['neighborlist.i','neighborlist.c','cvec.c'],
     include_dirs=options['include']+['.'],
     library_dirs=options['libdir'],
     libraries=options['libs']
-    )
+)
 
-setup (name = 'kimservice',
+setup(name = 'kimservice',
     version = '0.9.0',
     author      = "Woosong Choi, Matt Bierbaum, Yanjiun Chen",
     description = """KIM python interface""",
     ext_modules = [kimservice_module, kimneighborlist_module],
     py_modules = ['kimdescriptor'],
     data_files=[('kim_virial_template', ['virial/virial.c', 'virial/virial.h', 'virial/virial.i','virial/setup.py'])],
-    )
+)
