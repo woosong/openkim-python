@@ -1,0 +1,14 @@
+# rename this file to setup.cfg to modify the python wrapper build options
+
+[build]
+# where to look for the KIM API include files.  by default, this is at the
+# location specified by kim-api-build-config followed by location listed here
+#include = /usr/local/lib/kim-api/include/
+
+# location of the KIM API libraries.  by default, this is at the location
+# specified by kim-api-build-config, followed by the location listed here
+#libdir = /usr/local/lib/kim-api/
+
+# the libraries that are required to build the module.  default, determined
+# by the output of kim-api-build-config
+#libs = gfortran kim-api-v1
