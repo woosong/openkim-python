@@ -90,6 +90,9 @@ typedef void* voidp;
 int KIM_API_init_python(void **pkimmdl, char *testname, char *modelname) {
     return KIM_API_init((void*)pkimmdl, testname, modelname);
 };
+int KIM_API_file_init_python(void **pkimmdl, char *testname, char *modelname) {
+    return KIM_API_file_init((void*)pkimmdl, testname, modelname);
+};
 int KIM_API_init_python_str(void **pkimmdl, char *teststring, char *modelname) {
     return KIM_API_string_init((void*)pkimmdl, teststring, modelname);
 };
@@ -143,6 +146,14 @@ int KIM_API_init_python(void **pkimmdl, char *testname, char *modelname);
 def KIM_API_init(testname, modelname):
     ppkim = new_voidpp()
     status = KIM_API_init_python(ppkim, testname, modelname)
+    pkim = voidpp_value(ppkim)
+    return (status, pkim) 
+%}
+int KIM_API_file_init_python(void **pkimmdl, char *testkimfile, char *modelname);
+%pythoncode %{
+def KIM_API_file_init(testkimfile, modelname):
+    ppkim = new_voidpp()
+    status = KIM_API_file_init_python(ppkim, testkimfile, modelname)
     pkim = voidpp_value(ppkim)
     return (status, pkim) 
 %}
