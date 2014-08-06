@@ -21,7 +21,7 @@ def run_kim_build_config(opt='--version'):
         print("warning: kim-api-build-config not found on PATH while search for '%s'" % opt)
         return
 
-    return check_output([buildconf, opt])
+    return check_output([buildconf, opt]).strip()
 
 def getdefault(conf, sect, key, default=None):
     try:
