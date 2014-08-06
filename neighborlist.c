@@ -140,7 +140,7 @@ int nbl_get_neigh(void* kimmdl, int *mode, int *request, int* atom,
    int atomToReturn;
    int status;
    int* numberOfAtoms;
-   char* method;
+   const char* method;
    NeighList* nl;
    int i;
 
@@ -164,13 +164,12 @@ int nbl_get_neigh(void* kimmdl, int *mode, int *request, int* atom,
         nbl_build_neighborlist(kimmdl);
 
    /* figure out the neighbor locator type */
-   method = KIM_API_get_NBC_method(pkim, &status);
+   status = KIM_API_get_NBC_method(pkim, &method);
    if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
    if (!strcmp(method, "CLUSTER"))      cluster = 1;
    if (!strcmp(method, "NEIGH_RVEC_H")) ishalf = 1;
    if (!strcmp(method, "NEIGH_PURE_H")) ishalf = 1;
    if (!strcmp(method, "MI_OPBC_H"))    ishalf = 1;
-   safefree(method);
 
    /* check mode and request */
    if (0 == *mode) /* iterator mode */
@@ -387,16 +386,15 @@ void transform(double coords[3], double cell[9], double out[3]){
 int nbl_build_neighborlist(void *kimmdl){
     int rvec, pure, opbc;
     int status;
-    char *method;
+    const char *method;
 
-    method = KIM_API_get_NBC_method(kimmdl, &status);
+    status = KIM_API_get_NBC_method(kimmdl, &method);
     rvec = strcmp(method,"NEIGH_RVEC_F") * strcmp(method,"NEIGH_RVEC_H");
     pure = strcmp(method,"NEIGH_PURE_F") * strcmp(method,"NEIGH_PURE_H");
     opbc = strcmp(method,"MI_OPBC_F")    * strcmp(method,"MI_OPBC_H");
 
     if (KIM_STATUS_OK > status)
         KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
-    safefree(method);
 
     /* if the user didn't specify the box, die
        we don't want to produce non-sense by accident */
@@ -455,10 +453,10 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
     NeighList *nl;
 
     /* get the preferred neighborlist style from the API */
-    char *method = KIM_API_get_NBC_method(kimmdl, &status);
+    const char *method;
+    status = KIM_API_get_NBC_method(kimmdl, &method);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
     if (!strcmp(method, "NEIGH_RVEC_H"))  ishalf = 1;
-    safefree(method);
 
     /* get the data necessary for the neighborlist */
     KIM_API_getm_data(kimmdl, &status, 4*3,
@@ -736,17 +734,16 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
     double* coords;
     double* ncoords;
     double* cutoff;
-    char *method;
+    const char *method;
     double *box;
     NeighList *nl;
 
     int ishalf = 0;
 
     /* get the preferred neighborlist style from the API */
-    method = KIM_API_get_NBC_method(kimmdl, &status);
+    status = KIM_API_get_NBC_method(kimmdl, &method);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
     if (!strcmp(method, "MI_OPBC_H"))  ishalf = 1;
-    safefree(method);
 
     /* get the data necessary for the neighborlist */
     KIM_API_getm_data(kimmdl, &status, 5*3,
@@ -923,16 +920,15 @@ int nbl_build_neighborlist_cell_pure(void *kimmdl)
     int* numberContributingParticles;
     double* coords;
     double* cutoff;
-    char *method;
+    const char *method;
     NeighList *nl;
 
     int ishalf = 0;
 
     // get the preferred neighborlist style from the API
-    method = KIM_API_get_NBC_method(kimmdl, &status);
+    status = KIM_API_get_NBC_method(kimmdl, &method);
     if (KIM_STATUS_OK > status) KIM_API_report_error(__LINE__, __FILE__,"get_NBC_method", status);
     if (!strcmp(method, "NEIGH_PURE_H"))  ishalf = 1;
-    safefree(method);
 
     // get the data necessary for the neighborlist
     KIM_API_getm_data(kimmdl, &status, 4*3,

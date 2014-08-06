@@ -87,9 +87,6 @@ import_array();
 #include "KIM_API_C.h"
 #include "KIM_API_status.h"
 typedef void* voidp;
-int KIM_API_init_python(void **pkimmdl, char *testname, char *modelname) {
-    return KIM_API_init((void*)pkimmdl, testname, modelname);
-};
 int KIM_API_file_init_python(void **pkimmdl, char *testname, char *modelname) {
     return KIM_API_file_init((void*)pkimmdl, testname, modelname);
 };
@@ -141,14 +138,6 @@ int KIM_API_set_data_dtype(void *kimmdl, char *nm,int size, T *dt);
 %include "KIM_API_status.h"
 
 /*  These functions until EOF require additional attention to work */
-int KIM_API_init_python(void **pkimmdl, char *testname, char *modelname);
-%pythoncode %{
-def KIM_API_init(testname, modelname):
-    ppkim = new_voidpp()
-    status = KIM_API_init_python(ppkim, testname, modelname)
-    pkim = voidpp_value(ppkim)
-    return (status, pkim) 
-%}
 int KIM_API_file_init_python(void **pkimmdl, char *testkimfile, char *modelname);
 %pythoncode %{
 def KIM_API_file_init(testkimfile, modelname):
