@@ -99,7 +99,11 @@ int KIM_API_model_info_python(void **pmdl, char *modelname){
 void KIM_API_free_python(void **pkimmdl, int *error) {
     KIM_API_free((void*)pkimmdl, error);
 };
-
+const char *KIM_API_get_NBC_method_python(void *pkimmdl){
+    const char *method;
+    KIM_API_get_NBC_method(pkimmdl, &method);
+    return method;
+}
 /* 
     templated functions to set the necessary data pointers, use these at
     the bottom of this file to define links for all data types
@@ -168,6 +172,11 @@ def KIM_API_free(pkim):
     ppkim = new_voidpp()
     voidpp_assign(ppkim, pkim)
     return KIM_API_free_python(ppkim)
+%}
+const char *KIM_API_get_NBC_method_python(void *pkimmdl);
+%pythoncode %{
+def KIM_API_get_NBC_method(pkim):
+    return KIM_API_get_NBC_method_python(pkim)
 %}
 
 /*
