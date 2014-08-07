@@ -1,6 +1,6 @@
 # rename this file to setup.cfg to modify the python wrapper build options
 
-[build]
+[kim-api]
 # where to look for the KIM API include files.  by default, this is at the
 # location specified by kim-api-build-config followed by location listed here
 #include = /usr/local/lib/kim-api/include/
