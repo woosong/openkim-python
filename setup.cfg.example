@@ -11,4 +11,4 @@
 
 # the libraries that are required to build the module.  default, determined
 # by the output of kim-api-build-config
-#libs = gfortran kim-api-v1
+#libraries = gfortran kim-api-v1
