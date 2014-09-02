@@ -90,7 +90,7 @@ typedef void* voidp;
 int KIM_API_file_init_python(void **pkimmdl, char *testname, char *modelname) {
     return KIM_API_file_init((void*)pkimmdl, testname, modelname);
 };
-int KIM_API_init_python_str(void **pkimmdl, char *teststring, char *modelname) {
+int KIM_API_init_str_python(void **pkimmdl, char *teststring, char *modelname) {
     return KIM_API_string_init((void*)pkimmdl, teststring, modelname);
 };
 int KIM_API_model_info_python(void **pmdl, char *modelname){
@@ -104,6 +104,17 @@ const char *KIM_API_get_NBC_method_python(void *pkimmdl){
     KIM_API_get_NBC_method(pkimmdl, &method);
     return method;
 }
+int KIM_API_get_num_model_species_python(void *pkimmdl){
+    int num, len;
+    KIM_API_get_num_model_species(pkimmdl, &num, &len);
+    return num;
+}
+const char *KIM_API_get_model_species_python(void *pkimmdl, int ind){
+    const char *species;
+    KIM_API_get_model_species(pkimmdl, ind, &species);
+    return species;
+}
+
 /* 
     templated functions to set the necessary data pointers, use these at
     the bottom of this file to define links for all data types
@@ -150,11 +161,11 @@ def KIM_API_file_init(testkimfile, modelname):
     pkim = voidpp_value(ppkim)
     return (status, pkim) 
 %}
-int KIM_API_init_python_str(void **pkimmdl, char *teststring, char *modelname);
+int KIM_API_init_str_python(void **pkimmdl, char *teststring, char *modelname);
 %pythoncode %{
 def KIM_API_init_str(teststring, modelname):
     ppkim = new_voidpp()
-    status = KIM_API_init_python_str(ppkim, teststring, modelname)
+    status = KIM_API_init_str_python(ppkim, teststring, modelname)
     pkim = voidpp_value(ppkim)
     return (status, pkim) 
 %}
@@ -177,6 +188,16 @@ const char *KIM_API_get_NBC_method_python(void *pkimmdl);
 %pythoncode %{
 def KIM_API_get_NBC_method(pkim):
     return KIM_API_get_NBC_method_python(pkim)
+%}
+int KIM_API_get_num_model_species_python(void *pkimmdl);
+%pythoncode %{
+def KIM_API_get_num_model_species(pkim):
+    return KIM_API_get_num_model_species_python(pkim)
+%}
+const char *KIM_API_get_model_species_python(void *pkimmdl, int ind);
+%pythoncode %{
+def KIM_API_get_model_species(pkim, ind):
+    return KIM_API_get_model_species_python(pkim, ind)
 %}
 
 /*
