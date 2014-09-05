@@ -553,7 +553,8 @@ int nbl_build_neighborlist_cell_rvec(void *kimmdl)
            there are more copies to be periodic */
         if (size[i] <= 0){
             size[i] = 1;
-            copies[i] = (int)(R/rtemp) + 1;
+            copies[i] = (int)(R/rtemp);
+            copies[i] = copies[i] <= 0 ? 1 : copies[i];
         }
 
         size_total *= size[i];
@@ -810,7 +811,8 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
 
     for (i=0; i<3; i++){
         double rtemp = cellf[3*i+i];
-        size[i] = (int)((rtemp / R)*(max[i]-min[i])) + 1;
+        size[i] = (int)((rtemp / R)*(max[i]-min[i]));
+        size[i] = size[i] <= 0 ? 1 : size[i];
         if (pbc[i] && size[i] <= 2){
             fprintf(stderr, "NBL: Box is not > cutoff*2, self images will occur.\n");
             return 1;
@@ -981,7 +983,8 @@ int nbl_build_neighborlist_cell_pure(void *kimmdl)
     int size_total = 1;
 
     for (i=0; i<3; i++){
-        size[i] = (int)((max[i]-min[i])/R) + 1;
+        size[i] = (int)((max[i]-min[i])/R);
+        size[i] = size[i] <= 0 ? 1 : size[i];
         size_total *= size[i];
     }
 
