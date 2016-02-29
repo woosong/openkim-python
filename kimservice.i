@@ -87,13 +87,10 @@ import_array();
 #include "KIM_API_C.h"
 #include "KIM_API_status.h"
 typedef void* voidp;
-int KIM_API_init_python(void **pkimmdl, char *testname, char *modelname) {
-    return KIM_API_init((void*)pkimmdl, testname, modelname);
-};
 int KIM_API_file_init_python(void **pkimmdl, char *testname, char *modelname) {
     return KIM_API_file_init((void*)pkimmdl, testname, modelname);
 };
-int KIM_API_init_python_str(void **pkimmdl, char *teststring, char *modelname) {
+int KIM_API_init_str_python(void **pkimmdl, char *teststring, char *modelname) {
     return KIM_API_string_init((void*)pkimmdl, teststring, modelname);
 };
 int KIM_API_model_info_python(void **pmdl, char *modelname){
@@ -102,6 +99,21 @@ int KIM_API_model_info_python(void **pmdl, char *modelname){
 void KIM_API_free_python(void **pkimmdl, int *error) {
     KIM_API_free((void*)pkimmdl, error);
 };
+const char *KIM_API_get_NBC_method_python(void *pkimmdl){
+    const char *method;
+    KIM_API_get_NBC_method(pkimmdl, &method);
+    return method;
+}
+int KIM_API_get_num_model_species_python(void *pkimmdl){
+    int num, len;
+    KIM_API_get_num_model_species(pkimmdl, &num, &len);
+    return num;
+}
+const char *KIM_API_get_model_species_python(void *pkimmdl, int ind){
+    const char *species;
+    KIM_API_get_model_species(pkimmdl, ind, &species);
+    return species;
+}
 
 /* 
     templated functions to set the necessary data pointers, use these at
@@ -141,14 +153,6 @@ int KIM_API_set_data_dtype(void *kimmdl, char *nm,int size, T *dt);
 %include "KIM_API_status.h"
 
 /*  These functions until EOF require additional attention to work */
-int KIM_API_init_python(void **pkimmdl, char *testname, char *modelname);
-%pythoncode %{
-def KIM_API_init(testname, modelname):
-    ppkim = new_voidpp()
-    status = KIM_API_init_python(ppkim, testname, modelname)
-    pkim = voidpp_value(ppkim)
-    return (status, pkim) 
-%}
 int KIM_API_file_init_python(void **pkimmdl, char *testkimfile, char *modelname);
 %pythoncode %{
 def KIM_API_file_init(testkimfile, modelname):
@@ -157,11 +161,11 @@ def KIM_API_file_init(testkimfile, modelname):
     pkim = voidpp_value(ppkim)
     return (status, pkim) 
 %}
-int KIM_API_init_python_str(void **pkimmdl, char *teststring, char *modelname);
+int KIM_API_init_str_python(void **pkimmdl, char *teststring, char *modelname);
 %pythoncode %{
 def KIM_API_init_str(teststring, modelname):
     ppkim = new_voidpp()
-    status = KIM_API_init_python_str(ppkim, teststring, modelname)
+    status = KIM_API_init_str_python(ppkim, teststring, modelname)
     pkim = voidpp_value(ppkim)
     return (status, pkim) 
 %}
@@ -179,6 +183,21 @@ def KIM_API_free(pkim):
     ppkim = new_voidpp()
     voidpp_assign(ppkim, pkim)
     return KIM_API_free_python(ppkim)
+%}
+const char *KIM_API_get_NBC_method_python(void *pkimmdl);
+%pythoncode %{
+def KIM_API_get_NBC_method(pkim):
+    return KIM_API_get_NBC_method_python(pkim)
+%}
+int KIM_API_get_num_model_species_python(void *pkimmdl);
+%pythoncode %{
+def KIM_API_get_num_model_species(pkim):
+    return KIM_API_get_num_model_species_python(pkim)
+%}
+const char *KIM_API_get_model_species_python(void *pkimmdl, int ind);
+%pythoncode %{
+def KIM_API_get_model_species(pkim, ind):
+    return KIM_API_get_model_species_python(pkim, ind)
 %}
 
 /*
