@@ -811,9 +811,10 @@ int nbl_build_neighborlist_cell_opbc(void *kimmdl)
 
     for (i=0; i<3; i++){
         double rtemp = cellf[3*i+i];
-        size[i] = (int)((rtemp / R)*(max[i]-min[i]));
+        double ratio = ((rtemp / R)*(max[i]-min[i]));
+        size[i] = (int)ratio;
         size[i] = size[i] <= 0 ? 1 : size[i];
-        if (pbc[i] && size[i] <= 2){
+        if (pbc[i] && ratio <= 2.0){
             fprintf(stderr, "NBL: Box is not > cutoff*2, self images will occur.\n");
             return 1;
         }
