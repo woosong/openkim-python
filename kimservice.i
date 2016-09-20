@@ -96,6 +96,11 @@ int KIM_API_init_str_python(void **pkimmdl, char *teststring, char *modelname) {
 int KIM_API_model_info_python(void **pmdl, char *modelname){
     return KIM_API_model_info((void*)pmdl, modelname);
 };
+char *const KIM_API_get_model_kim_str_python(const char *modelname){
+    char *kimString;
+    KIM_API_get_model_kim_str(modelname, &kimString);
+    return kimString;
+};
 void KIM_API_free_python(void **pkimmdl, int *error) {
     KIM_API_free((void*)pkimmdl, error);
 };
@@ -114,7 +119,24 @@ const char *KIM_API_get_model_species_python(void *pkimmdl, int ind){
     KIM_API_get_model_species(pkimmdl, ind, &species);
     return species;
 }
-
+int KIM_API_get_num_free_params_python(void *pkimmdl){
+    int nfp, msl;
+    KIM_API_get_num_free_params(pkimmdl, &nfp, &msl);
+    return nfp;
+}
+int KIM_API_get_rank_python(void *pkimmdl, const char *nm, int *error){
+    return (int)KIM_API_get_rank(pkimmdl, nm, error);
+}
+int KIM_API_get_shape_python(void *pkimmdl, const char *nm, int *error){
+    int shape;
+    KIM_API_get_shape(pkimmdl, nm, &shape, error);
+    return shape;
+}
+const char *KIM_API_get_free_parameter_python(void *pkimmdl, const int index){
+    const char *param;
+    KIM_API_get_free_parameter(pkimmdl, index, &param);
+    return param;
+}
 /* 
     templated functions to set the necessary data pointers, use these at
     the bottom of this file to define links for all data types
@@ -169,6 +191,11 @@ def KIM_API_init_str(teststring, modelname):
     pkim = voidpp_value(ppkim)
     return (status, pkim) 
 %}
+char *const KIM_API_get_model_kim_str_python(const char *modelname);
+%pythoncode %{
+def KIM_API_get_model_kim_str(modelname):
+    return KIM_API_get_model_kim_str_python(modelname)
+%}
 int KIM_API_model_info_python(void **pmdl, char *modelname);
 %pythoncode %{
 def KIM_API_model_info(modelname):
@@ -198,6 +225,26 @@ const char *KIM_API_get_model_species_python(void *pkimmdl, int ind);
 %pythoncode %{
 def KIM_API_get_model_species(pkim, ind):
     return KIM_API_get_model_species_python(pkim, ind)
+%}
+int KIM_API_get_num_free_params_python(void *pkimmdl);
+%pythoncode %{
+def KIM_API_get_num_free_params(pkim):
+    return KIM_API_get_num_free_params_python(pkim)
+%}
+int KIM_API_get_rank_python(void *pkimmdl, const char *nm, int *error);
+%pythoncode %{
+def KIM_API_get_rank(pkim, nm):
+    return int(KIM_API_get_rank_python(pkim, nm))
+%}
+int KIM_API_get_shape_python(void *pkimmdl, const char *nm, int *error);
+%pythoncode %{
+def KIM_API_get_shape(pkim, nm):
+    return KIM_API_get_shape_python(pkim, nm)
+%}
+const char *KIM_API_get_free_parameter_python(void *pkimmdl, const int index);
+%pythoncode %{
+def KIM_API_get_free_parameter(pkim, index):
+    return KIM_API_get_free_parameter_python(pkim, index)
 %}
 
 /*
